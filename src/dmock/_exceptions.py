@@ -10,7 +10,7 @@ class UnexpectedCallError(DeclarativeMockError):
 
 
 class UnsatisfiedExpectationError(DeclarativeMockError):
-    """assert_expectations() found unmet quantifier constraints."""
+    """verify() found unmet quantifier constraints."""
 
 
 class ConfigurationError(DeclarativeMockError):

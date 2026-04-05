@@ -114,7 +114,7 @@ class DeclarativeMock(_Base):
             )
         self._properties[name] = value
 
-    def assert_expectations(self) -> None:
+    def verify(self) -> None:
         """Verify all registered expectations are satisfied.
 
         Raises UnsatisfiedExpectationError listing every unsatisfied expectation.

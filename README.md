@@ -50,7 +50,7 @@ service = DeclarativeMock(MyService)
 service.expect("fetch_user").returns({"id": 1, "name": "Ada"}).returns({"id": 1, "name": "Ada"})
 service.expect("fetch_user").raises(ConnectionError("retry"))
 # … exercise code …
-service.assert_expectations()
+service.verify()
 ```
 
 ## Usage examples

@@ -22,7 +22,7 @@ from dmock import DeclarativeMock
 mock = DeclarativeMock(MyService)
 mock.expect("process_order", 123).returns("processed")
 result = mock.process_order(123)  # "processed"
-mock.assert_expectations()
+mock.verify()
 ```
 
 ## Expectations
@@ -116,7 +116,7 @@ Registers a stub attribute `name` that returns `value` directly on attribute acc
 
 Raises `AttributeError` if `name` is not on the spec. Raises `ConfigurationError` if `name` is already registered via `expect()` (and `expect()` raises `ConfigurationError` if the name is already registered as a property stub).
 
-Property stubs have no quantifiers and are not tracked by `assert_expectations()`.
+Property stubs have no quantifiers and are not tracked by `verify()`.
 
 **Example:**
 
@@ -166,14 +166,14 @@ in_order(a, b, c)
 mock.do_something()
 mock.process_order(1)
 mock.greet("world")
-mock.assert_expectations()
+mock.verify()
 ```
 
 Calling expectations out of order raises `UnexpectedCallError`.
 
 ## Assertions
 
-### `mock.assert_expectations()`
+### `mock.verify()`
 
 Final verification: all registered expectations must be satisfied according to their quantifiers. Raises `UnsatisfiedExpectationError` with a message listing every unsatisfied expectation. Expectations marked `.maybe()` that were never called do not contribute to failures.
 
@@ -182,7 +182,7 @@ Final verification: all registered expectations must be satisfied according to t
 | Exception                    | When raised                                                            |
 | ---------------------------- | ---------------------------------------------------------------------- |
 | `UnexpectedCallError`        | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
-| `UnsatisfiedExpectationError`| `assert_expectations()` finds one or more expectations not satisfied   |
+| `UnsatisfiedExpectationError`| `verify()` finds one or more expectations not satisfied   |
 | `ConfigurationError`         | Invalid expectation setup (e.g. duplicate/conflicting quantifiers)     |
 
 ---

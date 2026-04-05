@@ -212,7 +212,7 @@ class TestUnexpectedCallsWithExpectations:
 
 
 # ---------------------------------------------------------------------------
-# Quantifier verification via assert_expectations()
+# Quantifier verification via verify()
 # ---------------------------------------------------------------------------
 
 
@@ -221,37 +221,37 @@ class TestAssertExpectations:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").returns("ok").once()
         mock.do_something()
-        mock.assert_expectations()  # must not raise
+        mock.verify()  # must not raise
 
     def test_unsatisfied_once_raises(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").returns("ok").once()
         with pytest.raises(UnsatisfiedExpectationError):
-            mock.assert_expectations()
+            mock.verify()
 
     def test_maybe_uncalled_passes(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").returns("ok").maybe()
-        mock.assert_expectations()  # must not raise
+        mock.verify()  # must not raise
 
     def test_never_uncalled_passes(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").never()
-        mock.assert_expectations()  # must not raise
+        mock.verify()  # must not raise
 
     def test_at_least_not_met_raises(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").returns("ok").at_least(2)
         mock.do_something()
         with pytest.raises(UnsatisfiedExpectationError):
-            mock.assert_expectations()
+            mock.verify()
 
     def test_between_satisfied(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.expect("do_something").returns("ok").between(1, 3)
         mock.do_something()
         mock.do_something()
-        mock.assert_expectations()  # must not raise
+        mock.verify()  # must not raise
 
     def test_mixed_satisfied_and_unsatisfied_lists_all(self) -> None:
         mock = DeclarativeMock(MyService)
@@ -260,7 +260,7 @@ class TestAssertExpectations:
         mock.do_something()
         # process_order not called → unsatisfied
         with pytest.raises(UnsatisfiedExpectationError) as exc_info:
-            mock.assert_expectations()
+            mock.verify()
         assert "process_order" in str(exc_info.value)
 
 
@@ -397,10 +397,10 @@ class TestPropertySupport:
         val = mock.value
         assert val == 99
 
-    def test_assert_expectations_passes_with_only_properties(self) -> None:
+    def test_verify_passes_with_only_properties(self) -> None:
         mock = DeclarativeMock(MyService)
         mock.property("value", 7)
-        mock.assert_expectations()  # must not raise
+        mock.verify()  # must not raise
 
     def test_property_after_expect_same_name_raises_configuration_error(self) -> None:
         mock = DeclarativeMock(MyService)
@@ -532,13 +532,13 @@ class TestNotBefore:
         result = b.not_before(a).returns("b")
         assert result is b
 
-    def test_not_before_does_not_affect_assert_expectations(self) -> None:
+    def test_not_before_does_not_affect_verify(self) -> None:
         mock = DeclarativeMock(MyService)
         a = mock.expect("do_something").returns("a").once()
         mock.expect("process_order", 1).returns("b").once().not_before(a)
-        # Neither called — assert_expectations checks quantifiers, not deps
+        # Neither called — verify checks quantifiers, not deps
         with pytest.raises(UnsatisfiedExpectationError):
-            mock.assert_expectations()
+            mock.verify()
 
 
 # ---------------------------------------------------------------------------
