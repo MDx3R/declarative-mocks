@@ -10,5 +10,3 @@ repos:
     rev: v1.18.2
     hooks:
       - id: mypy
-        args: ["--config-file", "pyproject.toml", "src", "tests"]
-        pass_filenames: false

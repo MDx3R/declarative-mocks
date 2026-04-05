@@ -6,9 +6,9 @@ Import package: **`dmock`**.
 
 ## Main type
 
-### `DeclarativeMock(spec=…, …)`
+### `DeclarativeMock(spec, /, …)`
 
-Constructs a mock object (backed by `unittest.mock` with `spec=`) that exposes the fluent expectation API below. Parameters follow the design goal: preserve standard `Mock` semantics where possible while adding expectations.
+Constructs a mock object (backed by `unittest.mock` with `spec=`) that exposes the fluent expectation API below. `spec` is positional-only; additional keyword arguments are forwarded to `unittest.mock.Mock`. Parameters follow the design goal: preserve standard `Mock` semantics where possible while adding expectations.
 
 **Usage sketch:**
 
