@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from typing import TYPE_CHECKING, Self
 
 from dmock._exceptions import ConfigurationError, UnexpectedCallError
@@ -21,7 +22,7 @@ from dmock._types import (
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from dmock._types import Outcome, Quantifier
 
@@ -52,6 +53,7 @@ class Expectation:
         self._quantifier: Quantifier | None = None
         self._optional: bool = False
         self._calls = 0
+        self._requires: list[Expectation] = []
 
     # -- Fluent outcome builders --
 
@@ -93,6 +95,40 @@ class Expectation:
 
     def never(self) -> Self:
         return self._set_quantifier(Never())
+
+    def not_before(self, *expectations: Expectation) -> Self:
+        """Declare that this expectation must not be dispatched until all *expectations* are satisfied.
+
+        Raises ConfigurationError if adding any requirement would create a cycle.
+        """
+        for req in expectations:
+            if self._is_reachable_from(req):
+                raise ConfigurationError(
+                    f"Cycle detected: adding {req!r} as a prerequisite of "
+                    f"{self!r} would create a circular dependency."
+                )
+            self._requires.append(req)
+        return self
+
+    def _is_reachable_from(self, source: Expectation) -> bool:
+        """Return True if *self* is reachable by following _requires from *source*."""
+        visited: set[int] = set()
+        queue: deque[Expectation] = deque([source])
+        while queue:
+            node = queue.popleft()
+            node_id = id(node)
+            if node_id in visited:
+                continue
+            visited.add(node_id)
+            if node is self:
+                return True
+            queue.extend(node._requires)  # noqa: SLF001
+        return False
+
+    @property
+    def requires(self) -> Sequence[Expectation]:
+        """Prerequisites that must be satisfied before this expectation can match."""
+        return self._requires
 
     def _set_quantifier(self, q: Quantifier) -> Self:
         if self._quantifier is not None:
@@ -147,13 +183,13 @@ class Expectation:
 
     def consume(self) -> Outcome:
         q = self.quantifier
-        if q.max_calls is not None and self._calls >= q.max_calls:
+        self._calls += 1
+        if q.max_calls is not None and self._calls > q.max_calls:
             raise UnexpectedCallError(
                 f"Unexpected call to {self._method_name!r}: "
-                f"already called {self._calls} time(s), "
+                f"called {self._calls} time(s), "
                 f"max allowed is {q.max_calls}."
             )
-        self._calls += 1
         if not self._outcomes:
             return DefaultOutcome()
         index = min(self._calls - 1, len(self._outcomes) - 1)
@@ -183,3 +219,13 @@ class Expectation:
             kwargs_parts.append("ANY_KWARGS")
         all_parts = ", ".join(args_parts + kwargs_parts)
         return f"Expectation({self._method_name}({all_parts}))"
+
+
+def in_order(*expectations: Expectation) -> None:
+    """Link *expectations* so each one requires the previous to be satisfied first.
+
+    Equivalent to calling ``expectations[i].not_before(expectations[i-1])`` for
+    every consecutive pair.  Passing 0 or 1 expectations is a no-op.
+    """
+    for i in range(1, len(expectations)):
+        expectations[i].not_before(expectations[i - 1])

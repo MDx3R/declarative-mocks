@@ -163,6 +163,12 @@ class DeclarativeMock(_Base):
                 f"Unexpected call: {name!r} called with args={args!r}, kwargs={kwargs!r} "
                 f"- no matching non-exhausted expectation."
             )
+        for req in exp.requires:
+            if not req.is_satisfied():
+                raise UnexpectedCallError(
+                    f"Out-of-order call: {name!r} requires {req.method_name!r} "
+                    f"to be satisfied first (call count: {req.call_count})."
+                )
         outcome = exp.consume()
         return _apply_outcome(outcome, self._mock, name, args, kwargs)
 

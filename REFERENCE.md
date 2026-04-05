@@ -129,6 +129,48 @@ val = mock.value  # no call needed
 assert val == 123
 ```
 
+## Global call ordering
+
+### `… .not_before(*expectations)`
+
+Declares that this expectation must not be consumed until every listed *expectation* is satisfied (its quantifier constraint is met). Returns `Self` for chaining.
+
+Raises `ConfigurationError` if adding the dependency would create a cycle.
+
+**Example — explicit prerequisite:**
+
+```python
+from dmock import DeclarativeMock
+
+mock = DeclarativeMock(MyService)
+init = mock.expect("do_something").returns("init").once()
+work = mock.expect("process_order", 1).returns("done").not_before(init)
+
+mock.do_something()       # satisfies init
+mock.process_order(1)     # now allowed
+```
+
+### `in_order(*expectations)`
+
+Top-level function that chains *expectations* so each one requires the previous to be satisfied first. Equivalent to calling `.not_before(prev)` on each expectation except the first. Zero or one argument is a no-op.
+
+```python
+from dmock import DeclarativeMock, in_order
+
+mock = DeclarativeMock(MyService)
+a = mock.expect("do_something").returns("a").once()
+b = mock.expect("process_order", 1).returns("b").once()
+c = mock.expect("greet", "world").returns("c").once()
+in_order(a, b, c)
+
+mock.do_something()
+mock.process_order(1)
+mock.greet("world")
+mock.assert_expectations()
+```
+
+Calling expectations out of order raises `UnexpectedCallError`.
+
 ## Assertions
 
 ### `mock.assert_expectations()`
@@ -142,10 +184,6 @@ Final verification: all registered expectations must be satisfied according to t
 | `UnexpectedCallError`        | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
 | `UnsatisfiedExpectationError`| `assert_expectations()` finds one or more expectations not satisfied   |
 | `ConfigurationError`         | Invalid expectation setup (e.g. duplicate/conflicting quantifiers)     |
-
-## Not yet available
-
-- **Global cross-method ordering** (`InOrder` / `NotBefore`) — planned for a future release.
 
 ---
 

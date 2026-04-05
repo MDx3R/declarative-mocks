@@ -60,8 +60,23 @@ When all outcomes of an expectation are consumed and the quantifier limit is rea
 - Duplicate or conflicting quantifiers on the same expectation — raises `ConfigurationError` at configuration time.
 - All expectations exhausted before `assert_expectations()` is called — may still pass if all were satisfied within their quantifier bounds.
 
+## Global call ordering
+
+`not_before` and `in_order` add a **dependency graph** between `Expectation` objects. A dependent expectation can only be dispatched once all its prerequisites are satisfied.
+
+- **`exp.not_before(*prerequisites)`** — declares that `exp` must not be consumed until every listed prerequisite satisfies its own quantifier (`is_satisfied()` returns `True`). If a prerequisite is not yet satisfied when `exp` would otherwise match, `UnexpectedCallError` is raised immediately (same as any other unexpected call). Cyclic dependencies (A requires B, B requires A) are rejected at configuration time with `ConfigurationError`.
+- **`in_order(*expectations)`** — convenience function that links consecutive expectations pairwise: `expectations[i].not_before(expectations[i-1])` for each `i ≥ 1`. Zero or one argument is a no-op.
+
+**Semantics of "satisfied" for dependency purposes** — identical to `assert_expectations()`: the expectation's quantifier constraint is met (`is_satisfied()` returns `True`). Specifically:
+
+- A `maybe()` expectation that was never called is considered satisfied.
+- A `never()` expectation that was never called is considered satisfied; one that was called (a violation) is not.
+
+Dependencies are a **dispatch-time guard only** and do not add new criteria to `assert_expectations()`. Unsatisfied prerequisites at the end of the test are caught by `assert_expectations()` through the normal quantifier check, not through dependency tracking.
+
+Cross-mock dependencies (prerequisites on a different `DeclarativeMock` instance) are supported.
+
 ## Non-goals (for this document)
 
 - Exact class names and internal algorithms.
 - Full parity with every feature of third-party mock libraries unless explicitly added to REFERENCE.md later.
-- Global cross-method ordering (`InOrder` / `NotBefore`) — planned but not yet implemented.

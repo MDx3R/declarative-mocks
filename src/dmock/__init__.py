@@ -8,6 +8,7 @@ from dmock._exceptions import (
     UnexpectedCallError,
     UnsatisfiedExpectationError,
 )
+from dmock._expectation import in_order
 from dmock._matchers import (
     ANY_ARGS,
     ANY_KWARGS,
@@ -29,4 +30,5 @@ __all__ = [
     "MatchedBy",
     "UnexpectedCallError",
     "UnsatisfiedExpectationError",
+    "in_order",
 ]

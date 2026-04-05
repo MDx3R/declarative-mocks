@@ -17,6 +17,7 @@ from dmock import (
     MatchedBy,
     UnexpectedCallError,
     UnsatisfiedExpectationError,
+    in_order,
 )
 
 
@@ -419,3 +420,182 @@ class TestPropertySupport:
         mock.expect("do_something").returns("done")
         assert mock.value == 42
         assert mock.do_something() == "done"
+
+
+# ---------------------------------------------------------------------------
+# not_before
+# ---------------------------------------------------------------------------
+
+
+class TestNotBefore:
+    def test_not_before_satisfied_allows_call(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        mock.expect("process_order", 1).returns("b").not_before(a)
+        mock.do_something()
+        assert mock.process_order(1) == "b"
+
+    def test_not_before_unsatisfied_raises(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        mock.expect("process_order", 1).returns("b").not_before(a)
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+    def test_not_before_multiple_deps_all_satisfied(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("greet", "hi").returns("b").once()
+        mock.expect("process_order", 1).returns("c").not_before(a, b)
+        mock.do_something()
+        mock.greet("hi")
+        assert mock.process_order(1) == "c"
+
+    def test_not_before_multiple_deps_one_unsatisfied(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("greet", "hi").returns("b").once()
+        mock.expect("process_order", 1).returns("c").not_before(a, b)
+        mock.do_something()
+        # b (greet) not yet called
+        with pytest.raises(UnexpectedCallError, match="greet"):
+            mock.process_order(1)
+
+    def test_not_before_chain_transitive(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("greet", "hi").returns("b").once().not_before(a)
+        mock.expect("process_order", 1).returns("c").not_before(b)
+        # a not satisfied yet — b blocked, so c blocked
+        with pytest.raises(UnexpectedCallError):
+            mock.process_order(1)
+        mock.do_something()
+        # b not yet called
+        with pytest.raises(UnexpectedCallError):
+            mock.process_order(1)
+        mock.greet("hi")
+        assert mock.process_order(1) == "c"
+
+    def test_not_before_cross_mock(self) -> None:
+        mock1 = DeclarativeMock(MyService)
+        mock2 = DeclarativeMock(MyService)
+        a = mock1.expect("do_something").returns("a").once()
+        mock2.expect("process_order", 1).returns("b").not_before(a)
+        with pytest.raises(UnexpectedCallError):
+            mock2.process_order(1)
+        mock1.do_something()
+        assert mock2.process_order(1) == "b"
+
+    def test_not_before_maybe_uncalled_satisfies_dep(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").maybe()
+        mock.expect("process_order", 1).returns("b").not_before(a)
+        # a was never called but is_satisfied() == True for maybe()
+        assert mock.process_order(1) == "b"
+
+    def test_not_before_never_uncalled_satisfies_dep(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").never()
+        mock.expect("process_order", 1).returns("b").not_before(a)
+        # never() uncalled → is_satisfied() == True
+        assert mock.process_order(1) == "b"
+
+    def test_not_before_never_violated_blocks_dep(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").never()
+        mock.expect("process_order", 1).returns("b").not_before(a)
+        # Calling do_something violates never() — consume() will raise
+        with pytest.raises(UnexpectedCallError):
+            mock.do_something()
+        # Now a.is_satisfied() == False (calls == 1 != 0) → process_order blocked
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+    def test_not_before_cycle_raises_config_error(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a")
+        b = mock.expect("process_order", 1).returns("b")
+        a.not_before(b)
+        with pytest.raises(ConfigurationError, match=r"[Cc]ycle"):
+            b.not_before(a)
+
+    def test_not_before_self_dep_raises_config_error(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a")
+        with pytest.raises(ConfigurationError, match=r"[Cc]ycle"):
+            a.not_before(a)
+
+    def test_not_before_returns_self_for_chaining(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("process_order", 1)
+        result = b.not_before(a).returns("b")
+        assert result is b
+
+    def test_not_before_does_not_affect_assert_expectations(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        mock.expect("process_order", 1).returns("b").once().not_before(a)
+        # Neither called — assert_expectations checks quantifiers, not deps
+        with pytest.raises(UnsatisfiedExpectationError):
+            mock.assert_expectations()
+
+
+# ---------------------------------------------------------------------------
+# in_order
+# ---------------------------------------------------------------------------
+
+
+class TestInOrder:
+    def test_in_order_enforces_sequence(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("process_order", 1).returns("b").once()
+        c = mock.expect("greet", "hi").returns("c").once()
+        in_order(a, b, c)
+        mock.do_something()
+        mock.process_order(1)
+        assert mock.greet("hi") == "c"
+
+    def test_in_order_violation_raises(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        b = mock.expect("process_order", 1).returns("b").once()
+        c = mock.expect("greet", "hi").returns("c").once()
+        in_order(a, b, c)
+        mock.do_something()
+        # c requires b satisfied first
+        with pytest.raises(UnexpectedCallError, match="process_order"):
+            mock.greet("hi")
+
+    def test_in_order_single_arg_noop(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").once()
+        in_order(a)  # must not raise, no links
+        assert list(a.requires) == []
+
+    def test_in_order_empty_noop(self) -> None:
+        in_order()  # must not raise
+
+    def test_in_order_cross_mock(self) -> None:
+        mock1 = DeclarativeMock(MyService)
+        mock2 = DeclarativeMock(MyService)
+        a = mock1.expect("do_something").returns("a").once()
+        b = mock2.expect("process_order", 1).returns("b").once()
+        in_order(a, b)
+        with pytest.raises(UnexpectedCallError):
+            mock2.process_order(1)
+        mock1.do_something()
+        assert mock2.process_order(1) == "b"
+
+    def test_in_order_with_quantifiers(self) -> None:
+        mock = DeclarativeMock(MyService)
+        a = mock.expect("do_something").returns("a").times(2)
+        b = mock.expect("process_order", 1).returns("b").once()
+        in_order(a, b)
+        mock.do_something()
+        # a not yet satisfied (needs 2 calls) — b blocked
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+        mock.do_something()
+        assert mock.process_order(1) == "b"
