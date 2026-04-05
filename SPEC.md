@@ -39,6 +39,13 @@ Quantifiers constrain how many times a given expectation (or chained block) may 
 - **runs(func)** — call `func(*args, **kwargs)` with the actual call arguments; the return value of `func` becomes the call result.
 - **No explicit outcome** — delegates to the internal `unittest.mock.Mock` child (returns a `Mock` object).
 
+## Property stubs
+
+- `property(name, value)` registers a **stub attribute** that returns `value` directly when the attribute is accessed on the mock (no call required).
+- Same spec-validation as `expect()`: raises `AttributeError` if `name` is not on the spec.
+- Property stubs have no quantifier tracking and are always considered satisfied; `assert_expectations()` ignores them.
+- Registering a property stub for a name that already has an `expect()` registration (or vice versa) raises `ConfigurationError` immediately at configuration time.
+
 ## Verification
 
 - **assert_expectations()** performs a final pass: all registered expectations must be satisfied (call counts and ordering rules as specified). Raises `UnsatisfiedExpectationError` listing every unsatisfied expectation.

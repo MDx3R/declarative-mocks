@@ -12,6 +12,7 @@ from dmock import (
     ANY_KWARGS,
     Anything,
     AnythingOfType,
+    ConfigurationError,
     DeclarativeMock,
     MatchedBy,
     UnexpectedCallError,
@@ -33,6 +34,10 @@ class MyService(ABC):
     def do_something(self) -> str: ...
     @abstractmethod
     def greet(self, name: str) -> str: ...
+
+    @property
+    def value(self) -> int:
+        raise NotImplementedError
 
 
 # ---------------------------------------------------------------------------
@@ -362,3 +367,55 @@ class TestAsyncDispatch:
         mock = DeclarativeMock(MyService)
         with pytest.raises(UnexpectedCallError):
             await mock.aprocess_order(1)
+
+
+# ---------------------------------------------------------------------------
+# Property stubs
+# ---------------------------------------------------------------------------
+
+
+class TestPropertySupport:
+    def test_basic_property_access_returns_value(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", 123)
+        assert mock.value == 123
+
+    def test_property_with_none_value(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", None)
+        assert mock.value is None
+
+    def test_property_nonspec_name_raises_attribute_error(self) -> None:
+        mock = DeclarativeMock(MyService)
+        with pytest.raises(AttributeError):
+            mock.property("nonexistent", 42)
+
+    def test_property_does_not_require_call(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", 99)
+        val = mock.value
+        assert val == 99
+
+    def test_assert_expectations_passes_with_only_properties(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", 7)
+        mock.assert_expectations()  # must not raise
+
+    def test_property_after_expect_same_name_raises_configuration_error(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something").returns("ok")
+        with pytest.raises(ConfigurationError):
+            mock.property("do_something", "stub")
+
+    def test_expect_after_property_same_name_raises_configuration_error(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", 1)
+        with pytest.raises(ConfigurationError):
+            mock.expect("value")
+
+    def test_multiple_properties_on_different_names(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.property("value", 42)
+        mock.expect("do_something").returns("done")
+        assert mock.value == 42
+        assert mock.do_something() == "done"

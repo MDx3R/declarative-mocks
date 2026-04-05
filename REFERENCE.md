@@ -108,6 +108,27 @@ from dmock import ANY_ARGS, ANY_KWARGS
 mock.expect("process_order", ANY_ARGS, ANY_KWARGS).returns("processed").at_least(1)
 ```
 
+## Property stubs
+
+### `mock.property(name, value, /)`
+
+Registers a stub attribute `name` that returns `value` directly on attribute access. No call is needed (no `()`).
+
+Raises `AttributeError` if `name` is not on the spec. Raises `ConfigurationError` if `name` is already registered via `expect()` (and `expect()` raises `ConfigurationError` if the name is already registered as a property stub).
+
+Property stubs have no quantifiers and are not tracked by `assert_expectations()`.
+
+**Example:**
+
+```python
+from dmock import DeclarativeMock
+
+mock = DeclarativeMock(MyService)
+mock.property("value", 123)
+val = mock.value  # no call needed
+assert val == 123
+```
+
 ## Assertions
 
 ### `mock.assert_expectations()`

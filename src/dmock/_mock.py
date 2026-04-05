@@ -4,7 +4,11 @@ import inspect
 from typing import TYPE_CHECKING, assert_never
 from unittest.mock import AsyncMock, Mock
 
-from dmock._exceptions import UnexpectedCallError, UnsatisfiedExpectationError
+from dmock._exceptions import (
+    ConfigurationError,
+    UnexpectedCallError,
+    UnsatisfiedExpectationError,
+)
 from dmock._expectation import Expectation
 from dmock._types import DefaultOutcome, RaiseOutcome, ReturnOutcome, RunOutcome
 
@@ -73,6 +77,7 @@ class DeclarativeMock(_Base):
         self._mock: Mock = Mock(spec=spec, **kwargs)
         self._expectations: list[Expectation] = []
         self._hooked: set[str] = set()
+        self._properties: dict[str, object] = {}
 
     # -- Public DSL --
 
@@ -80,13 +85,34 @@ class DeclarativeMock(_Base):
         """Register an expectation for attribute *name* on the spec.
 
         Raises AttributeError if *name* is not on the spec.
+        Raises ConfigurationError if *name* is already registered as a property stub.
         Returns an Expectation builder for chaining outcomes and quantifiers.
         """
         getattr(self._mock, name)  # spec validation
+        if name in self._properties:
+            raise ConfigurationError(
+                f"Cannot register expectation for {name!r}: "
+                f"a property stub is already registered for this name."
+            )
         exp = Expectation(name, args, kwargs)
         self._expectations.append(exp)
         self._hooked.add(name)
         return exp
+
+    def property(self, name: str, value: object, /) -> None:
+        """Register a stub attribute *name* that returns *value* on access.
+
+        Raises AttributeError if *name* is not on the spec.
+        Raises ConfigurationError if *name* is already registered via expect().
+        No quantifier tracking; always considered satisfied.
+        """
+        getattr(self._mock, name)  # spec validation
+        if name in self._hooked:
+            raise ConfigurationError(
+                f"Cannot register property {name!r}: "
+                f"an expectation is already registered for this name."
+            )
+        self._properties[name] = value
 
     def assert_expectations(self) -> None:
         """Verify all registered expectations are satisfied.
@@ -105,6 +131,8 @@ class DeclarativeMock(_Base):
         mock_attr = getattr(self._mock, name)  # AttributeError if not on spec
         if _is_dunder(name):
             return mock_attr
+        if name in self._properties:
+            return self._properties[name]
         if name not in self._hooked:
             raise UnexpectedCallError(
                 f"Unexpected call: {name!r} has no registered expectation."
