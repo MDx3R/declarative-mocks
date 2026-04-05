@@ -114,6 +114,10 @@ class Expectation:
     def is_quantifier_locked(self) -> bool:
         return self._quantifier is not None
 
+    @property
+    def method_name(self) -> str:
+        return self._method_name
+
     # -- Internal (called by DeclarativeMock) --
 
     def matches(
