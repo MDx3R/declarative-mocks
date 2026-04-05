@@ -30,16 +30,17 @@ line-length = 88
 target-version = "py311"
 src = ["src/dmock"]
 include = ["*.py", "*.pyi"]
-exclude = ["build", "dist", ".venv", ".git", "__pycache__"]
+exclude = ["build", "dist", ".venv", ".git", "__pycache__", "examples"]
 fix = true
 
 [tool.ruff.lint]
 select = [
     "E",
+    "W",
     "F",
     "I",
     "B",
-    "C",
+    "C4",
     "D",
     "N",
     "UP",
@@ -47,7 +48,14 @@ select = [
     "PL",
     "PT",
     "RUF",
-    "SLF001",
+    "SLF",
+    "SIM",
+    "TC",
+    "A",
+    "T20",
+    "PERF",
+    "PIE",
+    "FLY",
 ]
 ignore = [
     "RUF001",
@@ -64,22 +72,41 @@ ignore = [
     "D107",
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-type-checking]
+strict = true
+
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["dmock"]
 lines-after-imports = 2
 
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
 [tool.mypy]
 mypy_path = "src"
+explicit_package_bases = true
 python_version = "3.11"
 strict = true
-disallow_untyped_defs = true
 disallow_any_unimported = true
-no_implicit_optional = true
-check_untyped_defs = true
-warn_return_any = true
-warn_unused_ignores = true
 show_error_codes = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-cast", "truthy-bool"]
 
 [tool.pytest.ini_options]
-pythonpath = [".", "src", "tests"]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers --strict-config"
+
+[tool.coverage.run]
+source = ["dmock"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
