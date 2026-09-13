@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dmock._matchers import (
+from dmock import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
     AnythingOfType,
     MatchedBy,
     Matcher,
+)
+from dmock._matchers import (
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
     _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )

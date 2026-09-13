@@ -10,13 +10,14 @@ from dmock._exceptions import (
     UnexpectedCallError,
     UnsatisfiedExpectationError,
 )
-from dmock._expectation import in_order
+from dmock._expectation import Expectation, in_order
 from dmock._matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
     AnythingOfType,
     MatchedBy,
+    Matcher,
 )
 from dmock._mock import DeclarativeMock
 
@@ -35,7 +36,9 @@ __all__ = [
     "ConfigurationError",
     "DeclarativeMock",
     "DeclarativeMockError",
+    "Expectation",
     "MatchedBy",
+    "Matcher",
     "UnexpectedCallError",
     "UnsatisfiedExpectationError",
     "in_order",

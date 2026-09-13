@@ -326,6 +326,24 @@ class TestRepr:
 
 
 # ---------------------------------------------------------------------------
+# Reserved DSL names
+# ---------------------------------------------------------------------------
+
+
+class TestReservedDslNames:
+    @pytest.mark.parametrize("name", ["expect", "property", "verify"])
+    def test_spec_attribute_matching_dsl_raises(self, name: str) -> None:
+        spec = type("CollidingSpec", (), {name: lambda: None})
+        with pytest.raises(ConfigurationError, match=name):
+            DeclarativeMock(spec)
+
+    def test_ordinary_spec_still_constructs(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something").returns("ok")
+        assert mock.do_something() == "ok"
+
+
+# ---------------------------------------------------------------------------
 # Async dispatch
 # ---------------------------------------------------------------------------
 

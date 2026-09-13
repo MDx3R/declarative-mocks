@@ -14,6 +14,8 @@ Every spec method call must be preceded by a matching `expect()` registration; c
 
 Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The only difference is that the caller must `await` the call.
 
+The names `expect`, `property`, and `verify` are reserved for the DSL. If the spec defines any of them, `DeclarativeMock(spec)` raises `ConfigurationError` at construction time (the real attribute would otherwise be shadowed by the DSL method).
+
 **Usage sketch:**
 
 ```python
@@ -32,6 +34,8 @@ mock.verify()
 Registers an expectation for attribute `name`. Absence of `args`/`kwargs` after `name` means **no arguments** to the call, not a wildcard.
 
 Raises `AttributeError` if `name` is not on the spec.
+
+Returns an `Expectation` for chaining outcomes and quantifiers.
 
 **Examples:**
 
@@ -66,15 +70,15 @@ mock.expect("do_something").returns("ok").returns("ok").returns("fail")
 
 Applied after outcomes where the grammar allows:
 
-| Method            | Meaning                                          |
-| ----------------- | ------------------------------------------------ |
-| `maybe()`         | Optional: 0 calls still satisfies this expectation |
-| `once()`          | Exactly one matching call                        |
-| `twice()`         | Exactly two                                      |
-| `times(n)`        | Exactly `n`                                      |
-| `at_least(n)`     | Minimum `n`, no upper bound                      |
-| `at_most(n)`      | Between 0 and `n` inclusive                      |
-| `between(lo, hi)` | Inclusive range                                  |
+| Method            | Meaning                                              |
+| ----------------- | ---------------------------------------------------- |
+| `maybe()`         | Optional: 0 calls still satisfies this expectation   |
+| `once()`          | Exactly one matching call                            |
+| `twice()`         | Exactly two                                          |
+| `times(n)`        | Exactly `n`                                          |
+| `at_least(n)`     | Minimum `n`, no upper bound                          |
+| `at_most(n)`      | Between 0 and `n` inclusive                          |
+| `between(lo, hi)` | Inclusive range                                      |
 | `never()`         | Must not match; any matching call raises immediately |
 
 If no quantifier is set, the expectation defaults to `ExactlyN(max(1, len(outcomes)))`.
@@ -93,6 +97,8 @@ mock.expect("do_something").returns("ok").times(3)
 | `dmock.ANY_ARGS, dmock.ANY_KWARGS` | Wildcard matchers for any number of positional and keyword arguments |
 | `AnythingOfType(type)`             | Value must be instance of `type`                                     |
 | `MatchedBy(predicate)`             | Custom predicate on the value                                        |
+
+`Matcher` is a protocol with a single `matches(value) -> bool` method. Implement it to add a custom matcher; built-in matchers already satisfy it. `ANY_ARGS` and `ANY_KWARGS` are sentinels, not `Matcher`s.
 
 **Examples:**
 
@@ -133,7 +139,7 @@ assert val == 123
 
 ### `… .not_before(*expectations)`
 
-Declares that this expectation must not be consumed until every listed *expectation* is satisfied (its quantifier constraint is met). Returns `Self` for chaining.
+Declares that this expectation must not be consumed until every listed _expectation_ is satisfied (its quantifier constraint is met). Returns `Self` for chaining.
 
 Raises `ConfigurationError` if adding the dependency would create a cycle.
 
@@ -152,7 +158,7 @@ mock.process_order(1)     # now allowed
 
 ### `in_order(*expectations)`
 
-Top-level function that chains *expectations* so each one requires the previous to be satisfied first. Equivalent to calling `.not_before(prev)` on each expectation except the first. Zero or one argument is a no-op.
+Top-level function that chains _expectations_ so each one requires the previous to be satisfied first. Equivalent to calling `.not_before(prev)` on each expectation except the first. Zero or one argument is a no-op.
 
 ```python
 from dmock import DeclarativeMock, in_order
@@ -179,11 +185,11 @@ Final verification: all registered expectations must be satisfied according to t
 
 ## Errors
 
-| Exception                    | When raised                                                            |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| `UnexpectedCallError`        | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
-| `UnsatisfiedExpectationError`| `verify()` finds one or more expectations not satisfied   |
-| `ConfigurationError`         | Invalid expectation setup (e.g. duplicate/conflicting quantifiers)     |
+| Exception                     | When raised                                                                                                                                  |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
+| `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                      |
+| `ConfigurationError`          | Invalid expectation setup (e.g. duplicate/conflicting quantifiers, reserved DSL names on the spec)                                           |
 
 ---
 

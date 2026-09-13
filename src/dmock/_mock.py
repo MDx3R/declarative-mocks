@@ -71,11 +71,24 @@ else:
         pass
 
 
+_RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"})
+
+
 class DeclarativeMock(_Base):
     """Whitelist proxy over unittest.mock.Mock with a fluent expectation DSL."""
 
     def __init__(self, spec: type, /, **kwargs: object) -> None:
         self._mock: Mock = Mock(spec=spec, **kwargs)
+        colliding = sorted(
+            name for name in _RESERVED_DSL_NAMES if hasattr(self._mock, name)
+        )
+        if colliding:
+            names = ", ".join(repr(n) for n in colliding)
+            raise ConfigurationError(
+                f"Spec {spec.__name__!r} defines reserved DSL name(s) {names}. "
+                "Rename those attributes on the spec, or wrap a protocol without them."
+            )
+
         self._expectations: list[Expectation] = []
         self._hooked: set[str] = set()
         self._properties: dict[str, object] = {}

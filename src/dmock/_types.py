@@ -141,7 +141,6 @@ class Never:
     def is_exhausted(self, calls: int) -> bool:
         # Returns False intentionally: the dispatcher must keep this expectation
         # active so that a matching call can be routed here and raise in consume().
-        # TODO: Revise after implementing dispatch
         return False
 
     @property
