@@ -4,12 +4,12 @@ Instructions for AI coding agents and humans working in this repository.
 
 ## Project identity
 
-| Item | Value |
-|------|--------|
+| Item              | Value               |
+| ----------------- | ------------------- |
 | Distribution name | `declarative-mocks` |
-| Python import | `dmock` |
-| Source | `src/dmock/` |
-| Tests | `tests/` |
+| Python import     | `dmock`             |
+| Source            | `src/dmock/`        |
+| Tests             | `tests/`            |
 
 ## Setup
 
@@ -26,7 +26,7 @@ Run from the repository root (prefer `poetry run` if the venv is not active):
 ```bash
 ruff check .
 ruff format --check .
-mypy src
+mypy src tests
 ```
 
 Pyright / Pylance uses [pyrightconfig.json](pyrightconfig.json). CLI (if installed):
@@ -67,7 +67,7 @@ Update SPEC/REFERENCE when user-visible behavior or the public DSL changes.
 2. For non-trivial work: plan first (Cursor Plan mode or equivalent), then implement.
 3. Implement with strict typing; keep public API consistent with SPEC/REFERENCE.
 4. Add or update tests alongside code changes.
-5. Before considering work done: `ruff check`, `ruff format` (or format check), `mypy src`, Pyright clean, `pytest` (and coverage when relevant).
+5. Before considering work done: `ruff check`, `ruff format` (or format check), `mypy src tests`, Pyright clean, `pytest` (and coverage when relevant).
 6. Commit only after checks pass (or document intentional exceptions).
 
 ## Do not
@@ -75,7 +75,6 @@ Update SPEC/REFERENCE when user-visible behavior or the public DSL changes.
 - Add `Any` or untyped public APIs without project agreement.
 - Use `print` for debugging in library code (use logging or tests).
 - Skip updating SPEC.md / REFERENCE.md when changing documented behavior.
-- Reference or rely on `examples/` for core library design unless the maintainer asks.
 
 ## Code style
 
