@@ -81,8 +81,6 @@ ignore = [
     "D203",
     "D213",
     "E501",
-    "D100",
-    "D101",
     "D102",
     "D103",
     "D104",
@@ -92,7 +90,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["SLF001", "PLR2004"]
+"tests/**/*.py" = ["SLF001", "PLR2004", "D101"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -121,8 +119,9 @@ enable_error_code = ["ignore-without-code", "redundant-cast", "truthy-bool"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests"]
-addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests", "src"]
+addopts = "-ra -q --strict-markers --strict-config --doctest-modules"
+doctest_optionflags = "ELLIPSIS NORMALIZE_WHITESPACE"
 asyncio_mode = "auto"
 
 [tool.coverage.run]

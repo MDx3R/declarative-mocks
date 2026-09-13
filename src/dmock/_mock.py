@@ -50,7 +50,31 @@ _RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"}
 
 
 class DeclarativeMock(_Base):
-    """Whitelist proxy over unittest.mock.Mock with a fluent expectation DSL."""
+    """Whitelist proxy over ``unittest.mock.Mock`` with a fluent expectation DSL.
+
+    Every spec method must be registered with :meth:`expect` before it is
+    called. Dunder methods fall through to the internal ``Mock`` unless
+    registered. The names ``expect``, ``property``, and ``verify`` are
+    reserved: a spec that defines any of them raises
+    :class:`~dmock.ConfigurationError` at construction.
+
+    Args:
+        spec: Class or protocol whose attributes are allowed. Positional-only.
+        **kwargs: Forwarded to ``unittest.mock.Mock``.
+
+    Examples:
+        >>> from dmock import DeclarativeMock
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", "a").returns("A").once()
+        Expectation(fetch('a'))
+        >>> mock.fetch("a")
+        'A'
+        >>> mock.verify()
+        >>> mock
+        DeclarativeMock(spec=Service)
+    """
 
     def __init__(self, spec: type, /, **kwargs: object) -> None:
         self._mock: Mock = Mock(spec=spec, **kwargs)
@@ -72,11 +96,34 @@ class DeclarativeMock(_Base):
     # -- Public DSL --
 
     def expect(self, name: str, /, *args: object, **kwargs: object) -> Expectation:
-        """Register an expectation for attribute *name* on the spec.
+        """Register an expectation for attribute `name` on the spec.
 
-        Raises AttributeError if *name* is not on the spec.
-        Raises ConfigurationError if *name* is already registered as a property stub.
-        Returns an Expectation builder for chaining outcomes and quantifiers.
+        Absence of `*args` and `**kwargs` means a call with no arguments, not
+        a wildcard. Use matchers such as :data:`~dmock.Anything` or
+        :data:`~dmock.ANY_ARGS` to accept varying values.
+
+        Args:
+            name: Spec attribute to intercept. Positional-only.
+            *args: Expected positional arguments, possibly matchers.
+            **kwargs: Expected keyword arguments, possibly matchers.
+
+        Returns:
+            An :class:`~dmock.Expectation` for chaining outcomes and
+            quantifiers.
+
+        Raises:
+            AttributeError: If `name` is not on the spec.
+            ConfigurationError: If `name` is already a :meth:`property` stub.
+
+        Examples:
+            >>> from dmock import DeclarativeMock
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str: ...
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.expect("fetch", "a").returns("A")
+            Expectation(fetch('a'))
+            >>> mock.fetch("a")
+            'A'
         """
         getattr(self._mock, name)  # spec validation
         if name in self._properties:
@@ -91,11 +138,29 @@ class DeclarativeMock(_Base):
         return exp
 
     def property(self, name: str, value: object, /) -> None:
-        """Register a stub attribute *name* that returns *value* on access.
+        """Register a stub attribute `name` that returns `value` on access.
 
-        Raises AttributeError if *name* is not on the spec.
-        Raises ConfigurationError if *name* is already registered via expect().
-        No quantifier tracking; always considered satisfied.
+        No call is required. Property stubs have no quantifiers and are not
+        checked by :meth:`verify`.
+
+        Args:
+            name: Spec attribute to stub. Positional-only.
+            value: Object returned on attribute access. Positional-only.
+
+        Raises:
+            AttributeError: If `name` is not on the spec.
+            ConfigurationError: If `name` is already registered via
+                :meth:`expect`.
+
+        Examples:
+            >>> from dmock import DeclarativeMock
+            >>> class Service:
+            ...     value = 0
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.property("value", 123)
+            >>> mock.value
+            123
+            >>> mock.verify()
         """
         getattr(self._mock, name)  # spec validation
         if name in self._hooked:
@@ -107,9 +172,25 @@ class DeclarativeMock(_Base):
         self._properties[name] = value
 
     def verify(self) -> None:
-        """Verify all registered expectations are satisfied.
+        """Verify that every registered expectation meets its quantifier.
 
-        Raises UnsatisfiedExpectationError listing every unsatisfied expectation.
+        Raises:
+            UnsatisfiedExpectationError: One or more expectations are unmet.
+                The message lists each as ``expected <constraint>, got <n>``
+                and includes the call history when any calls were dispatched.
+
+        Examples:
+            >>> from dmock import DeclarativeMock, UnsatisfiedExpectationError
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str: ...
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.expect("fetch", "a").returns("A").once()
+            Expectation(fetch('a'))
+            >>> try:
+            ...     mock.verify()
+            ... except UnsatisfiedExpectationError as exc:
+            ...     "expected exactly 1 call(s), got 0" in str(exc)
+            True
         """
         unsatisfied = [e for e in self._expectations if not e.is_satisfied()]
         if not unsatisfied:

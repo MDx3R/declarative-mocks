@@ -15,16 +15,22 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ReturnOutcome:
+    """Return `value` from a matching call."""
+
     value: object
 
 
 @dataclass(frozen=True, slots=True)
 class RaiseOutcome:
+    """Raise `exception` from a matching call."""
+
     exception: BaseException | type[BaseException]
 
 
 @dataclass(frozen=True, slots=True)
 class RunOutcome:
+    """Call `func` with the actual arguments of a matching call."""
+
     func: Callable[..., object]
 
 
@@ -45,6 +51,8 @@ Outcome = ReturnOutcome | RaiseOutcome | RunOutcome | DefaultOutcome
 
 @dataclass(frozen=True, slots=True)
 class RecordedCall:
+    """A dispatched call stored for diagnostic messages."""
+
     name: str
     args: tuple[object, ...]
     kwargs: dict[str, object]

@@ -15,7 +15,12 @@ class DeclarativeMockError(Exception):
 
 
 class UnexpectedCallError(DeclarativeMockError):
-    """A call was made that matches no registered expectation."""
+    """A call matched no registered expectation.
+
+    Raised at dispatch time: missing ``expect``, argument mismatch, exhausted
+    expectation, out-of-order call, or ``never()``. Catch this type; the
+    traceback may show a more specific subclass.
+    """
 
 
 class UnregisteredCallError(UnexpectedCallError):
@@ -121,7 +126,7 @@ class ExceededCallError(UnexpectedCallError):
 
 
 class UnsatisfiedExpectationError(DeclarativeMockError):
-    """verify() found unmet quantifier constraints."""
+    """Raised by :meth:`~dmock.DeclarativeMock.verify` when a quantifier is unmet."""
 
     def __init__(
         self,
@@ -141,7 +146,7 @@ class UnsatisfiedExpectationError(DeclarativeMockError):
 
 
 class ConfigurationError(DeclarativeMockError):
-    """Invalid expectation setup (e.g. duplicate/conflicting quantifiers)."""
+    """Invalid expectation setup (conflicting quantifiers, reserved names, cycles)."""
 
 
 def _with_history(message: str, history: Sequence[RecordedCall]) -> str:
