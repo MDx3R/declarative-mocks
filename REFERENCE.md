@@ -1,8 +1,8 @@
-# REFERENCE — DSL surface (declarative-mocks)
+# REFERENCE - DSL surface (declarative-mocks)
 
-Catalog of the **public** DSL. Names match the intended API; adjust only if SPEC.md is updated accordingly.
+Catalog of the **public** DSL. Import package: **`dmock`**.
 
-Import package: **`dmock`**.
+Public names: `DeclarativeMock`, `Expectation`, `in_order`, `Anything`, `AnythingOfType`, `MatchedBy`, `Matcher`, `ANY_ARGS`, `ANY_KWARGS`, `DeclarativeMockError`, `UnexpectedCallError`, `UnsatisfiedExpectationError`, `ConfigurationError`.
 
 ## Main type
 
@@ -12,7 +12,7 @@ Constructs a whitelist mock that wraps `unittest.mock.Mock(spec=spec, **kwargs)`
 
 Every spec method call must be preceded by a matching `expect()` registration; calls without one raise `UnexpectedCallError`. Dunder methods (e.g. `__repr__`) delegate to the internal Mock unless explicitly registered.
 
-Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The only difference is that the caller must `await` the call.
+Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The caller must `await` the call. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction(mock.async_method)` is true on every supported Python (3.11-3.14).
 
 The names `expect`, `property`, and `verify` are reserved for the DSL. If the spec defines any of them, `DeclarativeMock(spec)` raises `ConfigurationError` at construction time (the real attribute would otherwise be shadowed by the DSL method).
 
@@ -33,9 +33,7 @@ mock.verify()
 
 Registers an expectation for attribute `name`. Absence of `args`/`kwargs` after `name` means **no arguments** to the call, not a wildcard.
 
-Raises `AttributeError` if `name` is not on the spec.
-
-Returns an `Expectation` for chaining outcomes and quantifiers.
+Raises `AttributeError` if `name` is not on the spec. Returns an `Expectation` for chaining outcomes and quantifiers.
 
 **Examples:**
 
@@ -56,9 +54,15 @@ Declares that the next matching call raises `exc`. If `exc` is an exception type
 
 Calls `func(*args, **kwargs)` with the actual call arguments when this expectation matches. The return value of `func` becomes the result of the call.
 
+Chaining `runs` then `returns` schedules **two** outcomes for **two** successive calls, not a side effect plus a return on the same call.
+
+On an async spec method, `func` may be sync or `async def`. The dispatcher awaits awaitable results.
+
 ## Chaining multiple outcomes
 
-Repeated `returns` / `raises` / `runs` on the same `expect` line define a **sequence** of responses to successive matching calls. Order is significant. When the sequence is exhausted, the last outcome repeats (for unbounded quantifiers).
+Repeated `returns` / `raises` / `runs` on the same `expect` line define a **sequence** of responses to successive matching calls. Order is significant.
+
+If you omit a quantifier, the count is exactly the number of chained outcomes (minimum 1). The last outcome repeats only when the quantifier allows more calls than outcomes (for example `.at_least(1)` or `.times(n)` with `n` greater than the sequence length).
 
 **Example:**
 
@@ -68,11 +72,10 @@ mock.expect("do_something").returns("ok").returns("ok").returns("fail")
 
 ## Quantifiers
 
-Applied after outcomes where the grammar allows:
+**One** quantifier per `expect(...)` chain. It applies to the whole expectation, not to the last outcome. A second quantifier on the same chain raises `ConfigurationError`.
 
 | Method            | Meaning                                              |
 | ----------------- | ---------------------------------------------------- |
-| `maybe()`         | Optional: 0 calls still satisfies this expectation   |
 | `once()`          | Exactly one matching call                            |
 | `twice()`         | Exactly two                                          |
 | `times(n)`        | Exactly `n`                                          |
@@ -89,6 +92,10 @@ If no quantifier is set, the expectation defaults to `ExactlyN(max(1, len(outcom
 mock.expect("do_something").returns("ok").times(3)
 ```
 
+### `… .maybe()`
+
+Not a quantifier. Marks the expectation optional: zero calls still pass `verify()` and count as satisfied for `not_before`. May be combined with a quantifier (`.once().maybe()`).
+
 ## Matchers (argument predicates)
 
 | Matcher                            | Role                                                                 |
@@ -98,7 +105,7 @@ mock.expect("do_something").returns("ok").times(3)
 | `AnythingOfType(type)`             | Value must be instance of `type`                                     |
 | `MatchedBy(predicate)`             | Custom predicate on the value                                        |
 
-`Matcher` is a protocol with a single `matches(value) -> bool` method. Implement it to add a custom matcher; built-in matchers already satisfy it. `ANY_ARGS` and `ANY_KWARGS` are sentinels, not `Matcher`s.
+`Matcher` is a public protocol with a single `matches(value) -> bool` method. Implement it to add a custom matcher; built-in matchers already satisfy it. `ANY_ARGS` and `ANY_KWARGS` are sentinels, not `Matcher`s.
 
 **Examples:**
 
@@ -139,11 +146,11 @@ assert val == 123
 
 ### `… .not_before(*expectations)`
 
-Declares that this expectation must not be consumed until every listed _expectation_ is satisfied (its quantifier constraint is met). Returns `Self` for chaining.
+Declares that this expectation must not be consumed until every listed expectation is satisfied (its quantifier constraint is met, including `maybe()` when never called). Returns `Self` for chaining.
 
 Raises `ConfigurationError` if adding the dependency would create a cycle.
 
-**Example — explicit prerequisite:**
+**Example - explicit prerequisite:**
 
 ```python
 from dmock import DeclarativeMock
@@ -158,7 +165,7 @@ mock.process_order(1)     # now allowed
 
 ### `in_order(*expectations)`
 
-Top-level function that chains _expectations_ so each one requires the previous to be satisfied first. Equivalent to calling `.not_before(prev)` on each expectation except the first. Zero or one argument is a no-op.
+Top-level function that chains expectations so each one requires the previous to be satisfied first. Equivalent to calling `.not_before(prev)` on each expectation except the first. Zero or one argument is a no-op.
 
 ```python
 from dmock import DeclarativeMock, in_order
@@ -187,9 +194,10 @@ Final verification: all registered expectations must be satisfied according to t
 
 | Exception                     | When raised                                                                                                                                  |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DeclarativeMockError`        | Base type for the three public errors below                                                                                                  |
 | `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
 | `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                      |
-| `ConfigurationError`          | Invalid expectation setup (e.g. duplicate/conflicting quantifiers, reserved DSL names on the spec)                                           |
+| `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names on the spec, `expect`/`property` clash, cycles in `not_before`                    |
 
 `UnexpectedCallError` for a dispatched call includes the actual `args`/`kwargs`, then a **Candidates** list of registered expectations for that name with a reason for each: `args mismatch`, `exhausted (n/max calls)`, or `blocked by <method> (expected …, got …)`. Out-of-order calls use the `blocked by` form. Messages also include a **Call history** of prior (and the failing) dispatches. Matching and ordering rules are unchanged; only the text is richer. The public type to catch is `UnexpectedCallError`; the raised instance is a more specific subclass so the traceback names the case (unregistered, no match, blocked, exceeded). Those subclasses are not part of the public DSL.
 

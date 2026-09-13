@@ -1,4 +1,4 @@
-# AGENTS.md — declarative-mocks
+# AGENTS.md - declarative-mocks
 
 Instructions for AI coding agents and humans working in this repository.
 
@@ -56,8 +56,9 @@ pre-commit run --all-files
 
 ## Documentation to read before behavioral changes
 
-- [SPEC.md](SPEC.md) — behavior, ordering rules, edge cases.
-- [REFERENCE.md](REFERENCE.md) — DSL surface (expectations, quantifiers, matchers).
+- [SPEC.md](SPEC.md) - behavior, ordering rules, edge cases.
+- [REFERENCE.md](REFERENCE.md) - DSL surface (expectations, quantifiers, matchers).
+- [CONTRIBUTING.md](CONTRIBUTING.md) - setup, Conventional Commits, AAA in tests.
 
 Update SPEC/REFERENCE when user-visible behavior or the public DSL changes.
 

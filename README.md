@@ -7,6 +7,8 @@
 
 ## Features
 
+---
+
 - **Fluent expectations** - register calls with arguments (positional vs keyword aware), matchers (`Anything`, `ANY_ARGS` / `ANY_KWARGS`, …), and outcomes in order.
 - **Return sequences** - chain multiple `.returns()` / `.raises()` / `.runs()` for successive matching calls.
 - **Call-count controls** - one quantifier per `expect(...)` (`.once()`, `.times(n)`, `.between(min, max)`, `.never()`, and more).
@@ -15,6 +17,8 @@
 - **No extra runtime dependencies** - only the standard library at runtime.
 
 ## Installation
+
+---
 
 The first PyPI release is being prepared. Until then, install from source:
 
@@ -29,6 +33,8 @@ pip install declarative-mocks
 ```
 
 ## The idea: before and after
+
+---
 
 **Before - `unittest.mock`:** behavior is spread across `return_value`, `side_effect`, and ad hoc assertions; ordering and “what happens on the third call?” are easy to lose in a long test.
 
@@ -58,6 +64,8 @@ service.verify()
 ```
 
 ## How it compares
+
+---
 
 The goals are the same as above: a strictly typed expectation DSL, a whitelist mock you construct, call order as a graph, and async wrapping every method in AsyncMock yourself. Against [mockito-python](https://github.com/kaste/mockito-python) and [flexmock](https://github.com/flexmock/flexmock) that looks like this.
 
@@ -118,6 +126,8 @@ mockito added first-class async/await stubbing in **2.0.0**. Their remaining cav
 `dmock` installs a real nested `async def` dispatcher, so `inspect.iscoroutinefunction(mock.aprocess_order)` is true on **every supported Python** (3.11-3.14).
 
 ## Usage examples
+
+---
 
 ### 1. Nested return values (successive `.returns()`)
 
@@ -201,12 +211,16 @@ For full DSL details and edge cases, see **`SPEC.md`** and **`REFERENCE.md`**.
 
 ## Limitations & non-goals
 
+---
+
 - **No signature binding.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature.
 - **No automatic `verify()`.** You call `verify()` yourself.
 - **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Construct a `DeclarativeMock` and pass it in.
 - **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
 
 ## Development
+
+---
 
 ```bash
 poetry install
@@ -217,7 +231,7 @@ pytest
 pytest --cov --cov-report=term-missing
 ```
 
-See **`AGENTS.md`** for the contributor and agent workflow.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, commits, and tests. Agents follow **[AGENTS.md](AGENTS.md)**.
 
 ## License
 
