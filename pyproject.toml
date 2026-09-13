@@ -1,6 +1,6 @@
 [project]
 name = "declarative-mocks"
-version = "0.1.0"
+version = "0.1.1"
 description = "Declare mock behavior as ordered expectations. Simple, typed, gomock-inspired DSL over unittest.mock"
 authors = [{ name = "Dimitry Churilov", email = "d.mdx3r@gmail.com" }]
 license = "MIT"

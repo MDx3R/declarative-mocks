@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.1.1] - 2026-09-13
+
+- Document PyPI installation (`pip install declarative-mocks`) and add a version badge. This is a docs-only release so the project page matches GitHub.
+
 ## [0.1.0] - 2026-09-13
 
 First release: a typed, gomock-inspired expectation DSL over `unittest.mock`.

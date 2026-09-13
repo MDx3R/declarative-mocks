@@ -1,4 +1,5 @@
 [![Checks](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml/badge.svg)](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/declarative-mocks.svg)](https://pypi.org/project/declarative-mocks/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
@@ -20,14 +21,6 @@
 ## Installation
 
 ---
-
-The first PyPI release is being prepared. Until then, install from source:
-
-```bash
-poetry install
-```
-
-The intended published command:
 
 ```bash
 pip install declarative-mocks
