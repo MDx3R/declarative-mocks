@@ -215,9 +215,21 @@ For full DSL details and edge cases, see **`SPEC.md`** and **`REFERENCE.md`**.
 ---
 
 - **No signature binding.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature.
-- **No automatic `verify()`.** You call `verify()` yourself.
+- **No automatic `verify()`.** You call `verify()` yourself (a pytest hook is on the roadmap).
 - **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Construct a `DeclarativeMock` and pass it in.
 - **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
+
+## Roadmap
+
+---
+
+After 0.1.0, in no particular order:
+
+- **pytest auto-`verify()`** - a plugin or fixture that runs `verify()` at the end of each test (gomock-style `Finish` on teardown), so you do not have to remember the call.
+- **Per-outcome counts (maybe)** - repeat a `.returns()` / `.raises()` / `.runs()` without chaining it n times (today `.returns(1).returns(1).returns(1).returns(2)`).
+- **Rich matchers** - more than `Anything` / `AnythingOfType` / `MatchedBy`: regex, numeric bounds, datetime (and ISO strings), containers, truthy/falsy, plus `and` / `or` / `not`. In the spirit of [anys](https://github.com/jwodder/anys).
+
+Other ideas belong in GitHub Issues.
 
 ## Development
 
