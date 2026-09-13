@@ -107,7 +107,9 @@ class Expectation:
                     f"Cycle detected: adding {req!r} as a prerequisite of "
                     f"{self!r} would create a circular dependency."
                 )
+
             self._requires.append(req)
+
         return self
 
     def _is_reachable_from(self, source: Expectation) -> bool:
@@ -119,10 +121,13 @@ class Expectation:
             node_id = id(node)
             if node_id in visited:
                 continue
+
             visited.add(node_id)
             if node is self:
                 return True
+
             queue.extend(node._requires)  # noqa: SLF001
+
         return False
 
     @property
@@ -135,6 +140,7 @@ class Expectation:
             raise ConfigurationError(
                 f"Conflicting quantifiers on expectation for {self._method_name!r}."
             )
+
         self._quantifier = q
         return self
 
@@ -144,6 +150,7 @@ class Expectation:
     def quantifier(self) -> Quantifier:
         if self._quantifier is not None:
             return self._quantifier
+
         return ExactlyN(max(1, len(self._outcomes)))
 
     @property
@@ -164,6 +171,7 @@ class Expectation:
         if not self._has_any_args:
             if len(args) != len(self._expected_args):
                 return False
+
             if not all(
                 _value_matches(e, a)
                 for e, a in zip(self._expected_args, args, strict=True)
@@ -173,6 +181,7 @@ class Expectation:
         if not self._has_any_kwargs:
             if kwargs.keys() != self._expected_kwargs.keys():
                 return False
+
             if not all(
                 _value_matches(self._expected_kwargs[k], kwargs[k])
                 for k in self._expected_kwargs
@@ -190,8 +199,10 @@ class Expectation:
                 f"called {self._calls} time(s), "
                 f"max allowed is {q.max_calls}."
             )
+
         if not self._outcomes:
             return DefaultOutcome()
+
         index = min(self._calls - 1, len(self._outcomes) - 1)
         return self._outcomes[index]
 
@@ -201,6 +212,7 @@ class Expectation:
     def is_satisfied(self) -> bool:
         if self._calls == 0 and self.is_optional():
             return True
+
         return self.quantifier.is_satisfied(self._calls)
 
     def is_exhausted(self) -> bool:
@@ -214,9 +226,11 @@ class Expectation:
         args_parts = [repr(a) for a in self._expected_args]
         if self._has_any_args:
             args_parts.insert(0, "ANY_ARGS")
+
         kwargs_parts = [f"{k}={v!r}" for k, v in self._expected_kwargs.items()]
         if self._has_any_kwargs:
             kwargs_parts.append("ANY_KWARGS")
+
         all_parts = ", ".join(args_parts + kwargs_parts)
         return f"Expectation({self._method_name}({all_parts}))"
 

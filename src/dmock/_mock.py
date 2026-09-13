@@ -30,6 +30,7 @@ def _find_expectation(
             continue
         if exp.matches(args, kwargs):
             return exp
+
     return None
 
 
@@ -94,6 +95,7 @@ class DeclarativeMock(_Base):
                 f"Cannot register expectation for {name!r}: "
                 f"a property stub is already registered for this name."
             )
+
         exp = Expectation(name, args, kwargs)
         self._expectations.append(exp)
         self._hooked.add(name)
@@ -112,6 +114,7 @@ class DeclarativeMock(_Base):
                 f"Cannot register property {name!r}: "
                 f"an expectation is already registered for this name."
             )
+
         self._properties[name] = value
 
     def verify(self) -> None:
@@ -122,6 +125,7 @@ class DeclarativeMock(_Base):
         unsatisfied = [e for e in self._expectations if not e.is_satisfied()]
         if not unsatisfied:
             return
+
         lines = "\n".join(f"  {e!r}" for e in unsatisfied)
         raise UnsatisfiedExpectationError(f"Unsatisfied expectations:\n{lines}")
 
@@ -131,8 +135,10 @@ class DeclarativeMock(_Base):
         mock_attr = getattr(self._mock, name)  # AttributeError if not on spec
         if _is_dunder(name):
             return mock_attr
+
         if name in self._properties:
             return self._properties[name]
+
         if name not in self._hooked:
             raise UnexpectedCallError(
                 f"Unexpected call: {name!r} has no registered expectation."
@@ -163,12 +169,14 @@ class DeclarativeMock(_Base):
                 f"Unexpected call: {name!r} called with args={args!r}, kwargs={kwargs!r} "
                 f"- no matching non-exhausted expectation."
             )
+
         for req in exp.requires:
             if not req.is_satisfied():
                 raise UnexpectedCallError(
                     f"Out-of-order call: {name!r} requires {req.method_name!r} "
                     f"to be satisfied first (call count: {req.call_count})."
                 )
+
         outcome = exp.consume()
         return _apply_outcome(outcome, self._mock, name, args, kwargs)
 
