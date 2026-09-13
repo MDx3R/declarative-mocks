@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from dmock._exceptions import ConfigurationError, UnexpectedCallError
+from dmock._exceptions import (
+    ConfigurationError,
+    ExceededCallError,
+    UnexpectedCallError,
+)
 from dmock._expectation import Expectation
 from dmock._matchers import ANY_ARGS, ANY_KWARGS, Anything, AnythingOfType, MatchedBy
 from dmock._types import (
@@ -113,6 +117,12 @@ class TestQuantifierTypes:
         assert Never().is_satisfied(0) is True
         assert Never().is_satisfied(1) is False
         assert Never().is_exhausted(0) is False  # stays active for dispatch
+
+    def test_description(self) -> None:
+        assert ExactlyN(2).description == "exactly 2 call(s)"
+        assert AtLeast(3).description == "at least 3 call(s)"
+        assert Between(1, 4).description == "between 1 and 4 call(s)"
+        assert Never().description == "never"
 
 
 # ---------------------------------------------------------------------------
@@ -418,8 +428,12 @@ class TestQuantifierNever:
 
     def test_consume_raises_unexpected_call(self) -> None:
         exp = make("f").never()
-        with pytest.raises(UnexpectedCallError):
+        with pytest.raises(UnexpectedCallError) as exc_info:
             exp.consume()
+        assert type(exc_info.value) is ExceededCallError
+        assert str(exc_info.value) == (
+            "Unexpected call to 'f': called 1 time(s), max allowed is 0."
+        )
 
     def test_is_not_exhausted_for_dispatch_safety(self) -> None:
         exp = make("f").never()

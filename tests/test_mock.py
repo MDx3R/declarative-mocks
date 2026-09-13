@@ -19,6 +19,11 @@ from dmock import (
     UnsatisfiedExpectationError,
     in_order,
 )
+from dmock._exceptions import (
+    BlockedCallError,
+    NoMatchingCallError,
+    UnregisteredCallError,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +214,114 @@ class TestUnexpectedCallsWithExpectations:
         mock.do_something()
         with pytest.raises(UnexpectedCallError):
             mock.do_something()
+
+
+# ---------------------------------------------------------------------------
+# Error diagnostics
+# ---------------------------------------------------------------------------
+
+
+class TestErrorDiagnostics:
+    def test_unregistered_name(self) -> None:
+        mock = DeclarativeMock(MyService)
+        with pytest.raises(UnexpectedCallError) as exc_info:
+            mock.do_something()
+        assert type(exc_info.value) is UnregisteredCallError
+        assert str(exc_info.value) == (
+            "Unexpected call: 'do_something' has no registered expectation."
+        )
+
+    def test_args_mismatch_lists_candidate(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("process_order", 99).returns("x")
+        with pytest.raises(UnexpectedCallError) as exc_info:
+            mock.process_order(1)
+        assert type(exc_info.value) is NoMatchingCallError
+        assert str(exc_info.value) == (
+            "Unexpected call: 'process_order' called with args=(1,), kwargs={} "
+            "- no matching non-exhausted expectation.\n"
+            "Candidates:\n"
+            "  Expectation(process_order(99)) - args mismatch\n"
+            "Call history:\n"
+            "  1. process_order(1)"
+        )
+
+    def test_exhausted_lists_candidate_with_counts(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something").returns("ok").once()
+        mock.do_something()
+        with pytest.raises(UnexpectedCallError) as exc_info:
+            mock.do_something()
+        assert type(exc_info.value) is NoMatchingCallError
+        assert str(exc_info.value) == (
+            "Unexpected call: 'do_something' called with args=(), kwargs={} "
+            "- no matching non-exhausted expectation.\n"
+            "Candidates:\n"
+            "  Expectation(do_something()) - exhausted (1/1 calls)\n"
+            "Call history:\n"
+            "  1. do_something()\n"
+            "  2. do_something()"
+        )
+
+    def test_multiple_candidates_mix_exhausted_and_mismatch(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("process_order", 1).returns("a").once()
+        mock.expect("process_order", 2).returns("b")
+        mock.process_order(1)
+        with pytest.raises(UnexpectedCallError) as exc_info:
+            mock.process_order(3)
+        assert type(exc_info.value) is NoMatchingCallError
+        assert str(exc_info.value) == (
+            "Unexpected call: 'process_order' called with args=(3,), kwargs={} "
+            "- no matching non-exhausted expectation.\n"
+            "Candidates:\n"
+            "  Expectation(process_order(1)) - exhausted (1/1 calls)\n"
+            "  Expectation(process_order(2)) - args mismatch\n"
+            "Call history:\n"
+            "  1. process_order(1)\n"
+            "  2. process_order(3)"
+        )
+
+    def test_blocked_by_prerequisite_uses_shared_format(self) -> None:
+        mock = DeclarativeMock(MyService)
+        init = mock.expect("do_something").returns("a").once()
+        mock.expect("process_order", 1).returns("b").not_before(init)
+        with pytest.raises(UnexpectedCallError) as exc_info:
+            mock.process_order(1)
+        assert type(exc_info.value) is BlockedCallError
+        assert str(exc_info.value) == (
+            "Out-of-order call: 'process_order' called with args=(1,), kwargs={}\n"
+            "  Expectation(process_order(1)) - blocked by do_something "
+            "(expected exactly 1 call(s), got 0)\n"
+            "Call history:\n"
+            "  1. process_order(1)"
+        )
+
+    def test_verify_reports_expected_and_got(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something").returns("ok").twice()
+        mock.do_something()
+        with pytest.raises(UnsatisfiedExpectationError) as exc_info:
+            mock.verify()
+        assert str(exc_info.value) == (
+            "Unsatisfied expectations:\n"
+            "  Expectation(do_something()) - expected exactly 2 call(s), got 1\n"
+            "Call history:\n"
+            "  1. do_something()"
+        )
+
+    def test_verify_at_least_uses_quantifier_description(self) -> None:
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something").returns("ok").at_least(2)
+        mock.do_something()
+        with pytest.raises(UnsatisfiedExpectationError) as exc_info:
+            mock.verify()
+        assert str(exc_info.value) == (
+            "Unsatisfied expectations:\n"
+            "  Expectation(do_something()) - expected at least 2 call(s), got 1\n"
+            "Call history:\n"
+            "  1. do_something()"
+        )
 
 
 # ---------------------------------------------------------------------------

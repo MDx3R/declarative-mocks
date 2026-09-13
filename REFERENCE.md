@@ -181,7 +181,7 @@ Calling expectations out of order raises `UnexpectedCallError`.
 
 ### `mock.verify()`
 
-Final verification: all registered expectations must be satisfied according to their quantifiers. Raises `UnsatisfiedExpectationError` with a message listing every unsatisfied expectation. Expectations marked `.maybe()` that were never called do not contribute to failures.
+Final verification: all registered expectations must be satisfied according to their quantifiers. Raises `UnsatisfiedExpectationError` with a message listing every unsatisfied expectation as `Expectation(...) - expected <constraint>, got <n>`. Expectations marked `.maybe()` that were never called do not contribute to failures. When any calls were dispatched, the message also includes a call history.
 
 ## Errors
 
@@ -190,6 +190,10 @@ Final verification: all registered expectations must be satisfied according to t
 | `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
 | `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                      |
 | `ConfigurationError`          | Invalid expectation setup (e.g. duplicate/conflicting quantifiers, reserved DSL names on the spec)                                           |
+
+`UnexpectedCallError` for a dispatched call includes the actual `args`/`kwargs`, then a **Candidates** list of registered expectations for that name with a reason for each: `args mismatch`, `exhausted (n/max calls)`, or `blocked by <method> (expected …, got …)`. Out-of-order calls use the `blocked by` form. Messages also include a **Call history** of prior (and the failing) dispatches. Matching and ordering rules are unchanged; only the text is richer. The public type to catch is `UnexpectedCallError`; the raised instance is a more specific subclass so the traceback names the case (unregistered, no match, blocked, exceeded). Those subclasses are not part of the public DSL.
+
+`UnsatisfiedExpectationError` lists each unmet expectation as `Expectation(...) - expected <constraint>, got <n>`, where `<constraint>` is the quantifier description (`exactly 2 call(s)`, `at least 3 call(s)`, `between 1 and 4 call(s)`, `never`).
 
 ---
 

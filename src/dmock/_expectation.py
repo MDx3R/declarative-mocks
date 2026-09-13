@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING, Self
 
-from dmock._exceptions import ConfigurationError, UnexpectedCallError
+from dmock._exceptions import ConfigurationError, ExceededCallError
 from dmock._matchers import (
     Matcher,
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 def _value_matches(expected: object, actual: object) -> bool:
     if isinstance(expected, Matcher):
         return expected.matches(actual)
+
     return expected == actual
 
 
@@ -194,11 +195,7 @@ class Expectation:
         q = self.quantifier
         self._calls += 1
         if q.max_calls is not None and self._calls > q.max_calls:
-            raise UnexpectedCallError(
-                f"Unexpected call to {self._method_name!r}: "
-                f"called {self._calls} time(s), "
-                f"max allowed is {q.max_calls}."
-            )
+            raise ExceededCallError(self._method_name, self._calls, q.max_calls)
 
         if not self._outcomes:
             return DefaultOutcome()

@@ -48,11 +48,11 @@ Quantifiers constrain how many times a given expectation (or chained block) may 
 
 ## Verification
 
-- **verify()** performs a final pass: all registered expectations must be satisfied (call counts and ordering rules as specified). Raises `UnsatisfiedExpectationError` listing every unsatisfied expectation.
+- **verify()** performs a final pass: all registered expectations must be satisfied (call counts and ordering rules as specified). Raises `UnsatisfiedExpectationError` listing every unsatisfied expectation with expected vs actual call counts. Diagnostic text does not change matching or dispatch rules.
 
 ## Exhaustion
 
-When all outcomes of an expectation are consumed and the quantifier limit is reached, the expectation is **exhausted**. Further calls that would match an exhausted expectation skip it and look for the next matching non-exhausted expectation. If none exists, `UnexpectedCallError` is raised.
+When all outcomes of an expectation are consumed and the quantifier limit is reached, the expectation is **exhausted**. Further calls that would match an exhausted expectation skip it and look for the next matching non-exhausted expectation. If none exists, `UnexpectedCallError` is raised. The error lists registered candidates for that name and why each was rejected (`args mismatch`, `exhausted`, or `blocked by` a prerequisite). This listing is diagnostic only; it does not change which expectation is selected.
 
 ## Edge cases (must be defined and tested)
 

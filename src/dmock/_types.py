@@ -40,6 +40,16 @@ class DefaultOutcome:
 Outcome = ReturnOutcome | RaiseOutcome | RunOutcome | DefaultOutcome
 
 
+# -- Recorded calls --
+
+
+@dataclass(frozen=True, slots=True)
+class RecordedCall:
+    name: str
+    args: tuple[object, ...]
+    kwargs: dict[str, object]
+
+
 # -- Quantifier protocol and concrete implementations --
 
 
@@ -57,6 +67,11 @@ class Quantifier(Protocol):
     @property
     def max_calls(self) -> int | None:
         """Upper bound on allowed calls; None means unbounded."""
+        ...
+
+    @property
+    def description(self) -> str:
+        """Human-readable constraint used in error messages."""
         ...
 
 
@@ -82,6 +97,10 @@ class ExactlyN:
     def max_calls(self) -> int:
         return self.n
 
+    @property
+    def description(self) -> str:
+        return f"exactly {self.n} call(s)"
+
 
 @dataclass(frozen=True, slots=True)
 class AtLeast:
@@ -102,6 +121,10 @@ class AtLeast:
     @property
     def max_calls(self) -> int | None:
         return None
+
+    @property
+    def description(self) -> str:
+        return f"at least {self.n} call(s)"
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +153,10 @@ class Between:
     def max_calls(self) -> int:
         return self.hi
 
+    @property
+    def description(self) -> str:
+        return f"between {self.lo} and {self.hi} call(s)"
+
 
 @dataclass(frozen=True, slots=True)
 class Never:
@@ -146,3 +173,7 @@ class Never:
     @property
     def max_calls(self) -> int:
         return 0
+
+    @property
+    def description(self) -> str:
+        return "never"
