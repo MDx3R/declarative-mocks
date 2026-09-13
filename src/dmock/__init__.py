@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version
+
 from dmock._exceptions import (
     ConfigurationError,
     DeclarativeMockError,
@@ -17,6 +19,12 @@ from dmock._matchers import (
     MatchedBy,
 )
 from dmock._mock import DeclarativeMock
+
+
+try:
+    __version__ = version("declarative-mocks")
+except PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0+unknown"
 
 
 __all__ = [

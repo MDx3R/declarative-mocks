@@ -1,4 +1,4 @@
-"""Smoke tests until the public API is implemented."""
+"""Smoke tests for the dmock package."""
 
 from __future__ import annotations
 

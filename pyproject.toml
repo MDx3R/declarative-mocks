@@ -1,18 +1,38 @@
 [project]
 name = "declarative-mocks"
 version = "0.1.0"
-description = ""
+description = "Declare mock behavior as ordered expectations. Simple, typed, gomock-inspired DSL over unittest.mock"
 authors = [{ name = "Dimitry Churilov", email = "nationmdxr@gmail.com" }]
 license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11"
+keywords = ["mock", "mocking", "testing", "unittest", "pytest"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Mocking",
+    "Typing :: Typed",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/MDx3R/declarative-mocks"
+Repository = "https://github.com/MDx3R/declarative-mocks"
+Issues = "https://github.com/MDx3R/declarative-mocks/issues"
 
 [tool.poetry]
 packages = [{ include = "dmock", from = "src" }]
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires = ["poetry-core>=2.2.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [dependency-groups]
@@ -31,7 +51,6 @@ target-version = "py311"
 src = ["src/dmock"]
 include = ["*.py", "*.pyi"]
 exclude = ["build", "dist", ".venv", ".git", "__pycache__", "examples"]
-fix = true
 
 [tool.ruff.lint]
 select = [
