@@ -2,7 +2,7 @@
 name = "declarative-mocks"
 version = "0.1.0"
 description = "Declare mock behavior as ordered expectations. Simple, typed, gomock-inspired DSL over unittest.mock"
-authors = [{ name = "Dimitry Churilov", email = "nationmdxr@gmail.com" }]
+authors = [{ name = "Dimitry Churilov", email = "d.mdx3r@gmail.com" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
