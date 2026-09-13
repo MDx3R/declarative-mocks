@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from dmock._exceptions import (
@@ -21,6 +23,10 @@ from dmock._types import (
     ReturnOutcome,
     RunOutcome,
 )
+
+
+if TYPE_CHECKING:
+    from dmock._types import Quantifier
 
 
 # ---------------------------------------------------------------------------
@@ -71,12 +77,10 @@ class TestQuantifierTypes:
         assert q.max_calls == 3
 
     def test_between_lo_equals_hi_valid(self) -> None:
-        q = Between(2, 2)
-        assert q.max_calls == 2
+        assert Between(2, 2).max_calls == 2
 
     def test_between_lo_zero_valid(self) -> None:
-        q = Between(0, 5)
-        assert q.lo == 0
+        assert Between(0, 5).lo == 0
 
     def test_between_lo_greater_than_hi_raises(self) -> None:
         with pytest.raises(ConfigurationError):
@@ -96,33 +100,45 @@ class TestQuantifierTypes:
         assert ExactlyN(3) == ExactlyN(3)
         assert ExactlyN(3) != ExactlyN(4)
 
-    def test_quantifier_is_satisfied_and_exhausted(self) -> None:
-        assert ExactlyN(2).is_satisfied(2) is True
-        assert ExactlyN(2).is_satisfied(1) is False
-        assert ExactlyN(2).is_exhausted(2) is True
-        assert ExactlyN(2).is_exhausted(1) is False
+    @pytest.mark.parametrize(
+        ("quantifier", "calls", "satisfied", "exhausted"),
+        [
+            (ExactlyN(2), 2, True, True),
+            (ExactlyN(2), 1, False, False),
+            (AtLeast(2), 2, True, False),
+            (AtLeast(2), 1, False, False),
+            (AtLeast(2), 100, True, False),
+            (Between(1, 3), 1, True, False),
+            (Between(1, 3), 0, False, False),
+            (Between(1, 3), 3, True, True),
+            (Between(1, 3), 2, True, False),
+            (Between(0, 2), 0, True, False),
+            (Between(0, 2), 2, True, True),
+            (Never(), 0, True, False),
+            (Never(), 1, False, False),
+        ],
+    )
+    def test_quantifier_is_satisfied_and_exhausted(
+        self,
+        quantifier: Quantifier,
+        calls: int,
+        satisfied: bool,
+        exhausted: bool,
+    ) -> None:
+        assert quantifier.is_satisfied(calls) is satisfied
+        assert quantifier.is_exhausted(calls) is exhausted
 
-        assert AtLeast(2).is_satisfied(2) is True
-        assert AtLeast(2).is_satisfied(1) is False
-        assert AtLeast(2).is_exhausted(100) is False
-
-        assert Between(1, 3).is_satisfied(1) is True
-        assert Between(1, 3).is_satisfied(0) is False
-        assert Between(1, 3).is_exhausted(3) is True
-        assert Between(1, 3).is_exhausted(2) is False
-
-        assert Between(0, 2).is_satisfied(0) is True  # at_most semantics
-        assert Between(0, 2).is_exhausted(2) is True
-
-        assert Never().is_satisfied(0) is True
-        assert Never().is_satisfied(1) is False
-        assert Never().is_exhausted(0) is False  # stays active for dispatch
-
-    def test_description(self) -> None:
-        assert ExactlyN(2).description == "exactly 2 call(s)"
-        assert AtLeast(3).description == "at least 3 call(s)"
-        assert Between(1, 4).description == "between 1 and 4 call(s)"
-        assert Never().description == "never"
+    @pytest.mark.parametrize(
+        ("quantifier", "expected"),
+        [
+            (ExactlyN(2), "exactly 2 call(s)"),
+            (AtLeast(3), "at least 3 call(s)"),
+            (Between(1, 4), "between 1 and 4 call(s)"),
+            (Never(), "never"),
+        ],
+    )
+    def test_description(self, quantifier: Quantifier, expected: str) -> None:
+        assert quantifier.description == expected
 
 
 # ---------------------------------------------------------------------------
@@ -132,43 +148,39 @@ class TestQuantifierTypes:
 
 class TestMatchingPositional:
     def test_no_args_matches_empty_call(self) -> None:
-        exp = make("f")
-        assert exp.matches((), {}) is True
+        assert make("f").matches((), {}) is True
 
     def test_no_args_rejects_positional(self) -> None:
-        exp = make("f")
-        assert exp.matches((1,), {}) is False
+        assert make("f").matches((1,), {}) is False
 
     def test_exact_positional_match(self) -> None:
-        exp = make("f", 1, 2)
-        assert exp.matches((1, 2), {}) is True
+        assert make("f", 1, 2).matches((1, 2), {}) is True
 
     def test_exact_positional_mismatch_value(self) -> None:
-        exp = make("f", 1, 2)
-        assert exp.matches((1, 3), {}) is False
+        assert make("f", 1, 2).matches((1, 3), {}) is False
 
     def test_exact_positional_mismatch_length(self) -> None:
-        exp = make("f", 1, 2)
-        assert exp.matches((1,), {}) is False
+        assert make("f", 1, 2).matches((1,), {}) is False
 
-    def test_anything_matcher_in_positional(self) -> None:
-        exp = make("f", Anything)
-        assert exp.matches((42,), {}) is True
-        assert exp.matches(("x",), {}) is True
+    @pytest.mark.parametrize("args", [(42,), ("x",)])
+    def test_anything_matcher_in_positional(self, args: tuple[object, ...]) -> None:
+        assert make("f", Anything).matches(args, {}) is True
 
     def test_anything_callable_in_positional(self) -> None:
-        exp = make("f", Anything())
-        assert exp.matches((99,), {}) is True
+        assert make("f", Anything()).matches((99,), {}) is True
 
-    def test_anything_of_type_in_positional(self) -> None:
-        exp = make("f", AnythingOfType(int))
-        assert exp.matches((5,), {}) is True
-        assert exp.matches(("s",), {}) is False
+    @pytest.mark.parametrize(("args", "expected"), [((5,), True), (("s",), False)])
+    def test_anything_of_type_in_positional(
+        self, args: tuple[object, ...], expected: bool
+    ) -> None:
+        assert make("f", AnythingOfType(int)).matches(args, {}) is expected
 
-    def test_matched_by_in_positional(self) -> None:
+    @pytest.mark.parametrize(("args", "expected"), [((3,), True), ((-1,), False)])
+    def test_matched_by_in_positional(
+        self, args: tuple[object, ...], expected: bool
+    ) -> None:
         exp = make("f", MatchedBy(lambda x: isinstance(x, int) and x > 0))
-        assert exp.matches((3,), {}) is True
-        assert exp.matches((-1,), {}) is False
+        assert exp.matches(args, {}) is expected
 
 
 # ---------------------------------------------------------------------------
@@ -178,25 +190,28 @@ class TestMatchingPositional:
 
 class TestMatchingKeyword:
     def test_exact_kwargs_match(self) -> None:
-        exp = Expectation("f", (), {"x": 1, "y": 2})
-        assert exp.matches((), {"x": 1, "y": 2}) is True
+        assert (
+            Expectation("f", (), {"x": 1, "y": 2}).matches((), {"x": 1, "y": 2}) is True
+        )
 
     def test_kwargs_mismatch_value(self) -> None:
-        exp = Expectation("f", (), {"x": 1})
-        assert exp.matches((), {"x": 99}) is False
+        assert Expectation("f", (), {"x": 1}).matches((), {"x": 99}) is False
 
     def test_kwargs_mismatch_key(self) -> None:
-        exp = Expectation("f", (), {"x": 1})
-        assert exp.matches((), {"y": 1}) is False
+        assert Expectation("f", (), {"x": 1}).matches((), {"y": 1}) is False
 
     def test_kwargs_extra_key_rejected(self) -> None:
-        exp = Expectation("f", (), {"x": 1})
-        assert exp.matches((), {"x": 1, "y": 2}) is False
+        assert Expectation("f", (), {"x": 1}).matches((), {"x": 1, "y": 2}) is False
 
-    def test_matcher_in_kwargs(self) -> None:
-        exp = Expectation("f", (), {"x": AnythingOfType(str)})
-        assert exp.matches((), {"x": "hello"}) is True
-        assert exp.matches((), {"x": 42}) is False
+    @pytest.mark.parametrize(
+        ("kwargs", "expected"),
+        [({"x": "hello"}, True), ({"x": 42}, False)],
+    )
+    def test_matcher_in_kwargs(self, kwargs: dict[str, object], expected: bool) -> None:
+        assert (
+            Expectation("f", (), {"x": AnythingOfType(str)}).matches((), kwargs)
+            is expected
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -206,12 +221,15 @@ class TestMatchingKeyword:
 
 class TestMatchingMixed:
     def test_positional_and_kwargs(self) -> None:
-        exp = Expectation("f", (1,), {"key": "val"})
-        assert exp.matches((1,), {"key": "val"}) is True
+        assert (
+            Expectation("f", (1,), {"key": "val"}).matches((1,), {"key": "val"}) is True
+        )
 
     def test_positional_mismatch_but_kwargs_ok(self) -> None:
-        exp = Expectation("f", (1,), {"key": "val"})
-        assert exp.matches((2,), {"key": "val"}) is False
+        assert (
+            Expectation("f", (1,), {"key": "val"}).matches((2,), {"key": "val"})
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -220,30 +238,42 @@ class TestMatchingMixed:
 
 
 class TestMatchingSentinels:
-    def test_any_args_accepts_any_positional(self) -> None:
-        exp = Expectation("f", (ANY_ARGS,), {})
-        assert exp.matches((1, 2, 3), {}) is True
-        assert exp.matches((), {}) is True
+    @pytest.mark.parametrize("args", [(1, 2, 3), ()])
+    def test_any_args_accepts_any_positional(self, args: tuple[object, ...]) -> None:
+        assert Expectation("f", (ANY_ARGS,), {}).matches(args, {}) is True
 
-    def test_any_kwargs_accepts_any_kwargs(self) -> None:
-        exp = Expectation("f", (ANY_KWARGS,), {})
-        assert exp.matches((), {"a": 1, "b": 2}) is True
-        assert exp.matches((), {}) is True
+    @pytest.mark.parametrize("kwargs", [{"a": 1, "b": 2}, {}])
+    def test_any_kwargs_accepts_any_kwargs(self, kwargs: dict[str, object]) -> None:
+        assert Expectation("f", (ANY_KWARGS,), {}).matches((), kwargs) is True
 
-    def test_both_sentinels_accepts_anything(self) -> None:
-        exp = Expectation("f", (ANY_ARGS, ANY_KWARGS), {})
-        assert exp.matches((1, 2), {"x": "y"}) is True
-        assert exp.matches((), {}) is True
+    @pytest.mark.parametrize(
+        ("args", "kwargs"),
+        [((1, 2), {"x": "y"}), ((), {})],
+    )
+    def test_both_sentinels_accepts_anything(
+        self, args: tuple[object, ...], kwargs: dict[str, object]
+    ) -> None:
+        assert (
+            Expectation("f", (ANY_ARGS, ANY_KWARGS), {}).matches(args, kwargs) is True
+        )
 
-    def test_any_args_with_expected_kwargs(self) -> None:
-        exp = Expectation("f", (ANY_ARGS,), {"key": "val"})
-        assert exp.matches((1, 2), {"key": "val"}) is True
-        assert exp.matches((1, 2), {"key": "wrong"}) is False
+    @pytest.mark.parametrize(
+        ("kwargs", "expected"),
+        [({"key": "val"}, True), ({"key": "wrong"}, False)],
+    )
+    def test_any_args_with_expected_kwargs(
+        self, kwargs: dict[str, object], expected: bool
+    ) -> None:
+        assert (
+            Expectation("f", (ANY_ARGS,), {"key": "val"}).matches((1, 2), kwargs)
+            is expected
+        )
 
-    def test_any_kwargs_with_expected_args(self) -> None:
-        exp = Expectation("f", (1, 2, ANY_KWARGS), {})
-        assert exp.matches((1, 2), {}) is True
-        assert exp.matches((), {}) is False
+    @pytest.mark.parametrize(("args", "expected"), [((1, 2), True), ((), False)])
+    def test_any_kwargs_with_expected_args(
+        self, args: tuple[object, ...], expected: bool
+    ) -> None:
+        assert Expectation("f", (1, 2, ANY_KWARGS), {}).matches(args, {}) is expected
 
 
 # ---------------------------------------------------------------------------
@@ -253,17 +283,16 @@ class TestMatchingSentinels:
 
 class TestOutcomeSequencing:
     def test_single_returns(self) -> None:
-        exp = make("f").returns("ok").once()
-        assert exp.consume() == ReturnOutcome("ok")
+        assert make("f").returns("ok").once().consume() == ReturnOutcome("ok")
 
     def test_single_raises(self) -> None:
-        exp = make("f").raises(ValueError).at_least(1)
-        assert exp.consume() == RaiseOutcome(ValueError)
+        assert make("f").raises(ValueError).at_least(1).consume() == RaiseOutcome(
+            ValueError
+        )
 
     def test_single_runs(self) -> None:
         fn = lambda: None  # noqa: E731
-        exp = make("f").runs(fn).at_least(1)
-        assert exp.consume() == RunOutcome(fn)
+        assert make("f").runs(fn).at_least(1).consume() == RunOutcome(fn)
 
     def test_chained_returns_sequence(self) -> None:
         exp = make("f").returns("a").returns("b")
@@ -272,13 +301,12 @@ class TestOutcomeSequencing:
 
     def test_last_outcome_repeats_after_list_end(self) -> None:
         exp = make("f").returns("a").returns("b").at_least(1)
-        exp.consume()  # "a"
-        exp.consume()  # "b"
-        assert exp.consume() == ReturnOutcome("b")  # repeats last
+        exp.consume()
+        exp.consume()
+        assert exp.consume() == ReturnOutcome("b")
 
     def test_no_outcomes_returns_default(self) -> None:
-        exp = make("f").at_least(1)
-        assert exp.consume() == DefaultOutcome()
+        assert make("f").at_least(1).consume() == DefaultOutcome()
 
 
 # ---------------------------------------------------------------------------
@@ -360,8 +388,7 @@ class TestQuantifierAtLeast:
 
 class TestQuantifierAtMost:
     def test_satisfied_at_zero_calls(self) -> None:
-        exp = make("f").returns("x").at_most(2)
-        assert exp.is_satisfied() is True
+        assert make("f").returns("x").at_most(2).is_satisfied() is True
 
     def test_exhausted_at_max(self) -> None:
         exp = make("f").returns("x").at_most(2)
@@ -396,12 +423,10 @@ class TestQuantifierBetween:
 
 class TestQuantifierMaybe:
     def test_always_satisfied_at_zero_calls(self) -> None:
-        exp = make("f").returns("x").maybe()
-        assert exp.is_satisfied() is True
+        assert make("f").returns("x").maybe().is_satisfied() is True
 
     def test_once_maybe_satisfied_before_call(self) -> None:
-        exp = make("f").returns("x").once().maybe()
-        assert exp.is_satisfied() is True
+        assert make("f").returns("x").once().maybe().is_satisfied() is True
 
     def test_once_maybe_satisfied_after_call(self) -> None:
         exp = make("f").returns("x").once().maybe()
@@ -409,22 +434,18 @@ class TestQuantifierMaybe:
         assert exp.is_satisfied() is True
 
     def test_maybe_then_count_satisfied_before_call(self) -> None:
-        exp = make("f").returns("x").maybe().once()
-        assert exp.is_satisfied() is True
+        assert make("f").returns("x").maybe().once().is_satisfied() is True
 
     def test_optional_flag_set(self) -> None:
-        exp = make("f").returns("x").maybe()
-        assert exp.is_optional() is True
+        assert make("f").returns("x").maybe().is_optional() is True
 
     def test_maybe_does_not_lock_quantifier(self) -> None:
-        exp = make("f").maybe()
-        assert exp.is_quantifier_locked is False
+        assert make("f").maybe().is_quantifier_locked is False
 
 
 class TestQuantifierNever:
     def test_satisfied_when_uncalled(self) -> None:
-        exp = make("f").never()
-        assert exp.is_satisfied() is True
+        assert make("f").never().is_satisfied() is True
 
     def test_consume_raises_unexpected_call(self) -> None:
         exp = make("f").never()
@@ -436,8 +457,7 @@ class TestQuantifierNever:
         )
 
     def test_is_not_exhausted_for_dispatch_safety(self) -> None:
-        exp = make("f").never()
-        assert exp.is_exhausted() is False
+        assert make("f").never().is_exhausted() is False
 
 
 # ---------------------------------------------------------------------------
@@ -479,36 +499,28 @@ class TestConsumeExhaustionGuard:
 
 class TestAutoQuantifier:
     def test_one_outcome_means_exactly_once(self) -> None:
-        exp = make("f").returns("a")
-        assert exp.quantifier == ExactlyN(1)
+        assert make("f").returns("a").quantifier == ExactlyN(1)
 
     def test_two_outcomes_means_exactly_twice(self) -> None:
-        exp = make("f").returns("a").returns("b")
-        assert exp.quantifier == ExactlyN(2)
+        assert make("f").returns("a").returns("b").quantifier == ExactlyN(2)
 
     def test_no_outcomes_means_exactly_once(self) -> None:
-        exp = make("f")
-        assert exp.quantifier == ExactlyN(1)
+        assert make("f").quantifier == ExactlyN(1)
 
     def test_explicit_times_overrides_outcome_count(self) -> None:
-        exp = make("f").returns("a").times(5)
-        assert exp.quantifier == ExactlyN(5)
+        assert make("f").returns("a").times(5).quantifier == ExactlyN(5)
 
     def test_at_least_quantifier(self) -> None:
-        exp = make("f").returns("a").at_least(2)
-        assert exp.quantifier == AtLeast(2)
+        assert make("f").returns("a").at_least(2).quantifier == AtLeast(2)
 
     def test_between_quantifier(self) -> None:
-        exp = make("f").returns("a").between(1, 4)
-        assert exp.quantifier == Between(1, 4)
+        assert make("f").returns("a").between(1, 4).quantifier == Between(1, 4)
 
     def test_at_most_maps_to_between(self) -> None:
-        exp = make("f").returns("a").at_most(3)
-        assert exp.quantifier == Between(0, 3)
+        assert make("f").returns("a").at_most(3).quantifier == Between(0, 3)
 
     def test_never_quantifier(self) -> None:
-        exp = make("f").never()
-        assert exp.quantifier == Never()
+        assert make("f").never().quantifier == Never()
 
 
 # ---------------------------------------------------------------------------
@@ -518,20 +530,16 @@ class TestAutoQuantifier:
 
 class TestIsQuantifierLocked:
     def test_not_locked_by_default(self) -> None:
-        exp = make("f")
-        assert exp.is_quantifier_locked is False
+        assert make("f").is_quantifier_locked is False
 
     def test_locked_after_once(self) -> None:
-        exp = make("f").once()
-        assert exp.is_quantifier_locked is True
+        assert make("f").once().is_quantifier_locked is True
 
     def test_not_locked_after_maybe_only(self) -> None:
-        exp = make("f").maybe()
-        assert exp.is_quantifier_locked is False
+        assert make("f").maybe().is_quantifier_locked is False
 
     def test_locked_after_maybe_then_once(self) -> None:
-        exp = make("f").maybe().once()
-        assert exp.is_quantifier_locked is True
+        assert make("f").maybe().once().is_quantifier_locked is True
 
 
 # ---------------------------------------------------------------------------
@@ -549,12 +557,10 @@ class TestConfigurationErrors:
             make("f").returns("x").times(3).at_least(1)
 
     def test_once_then_maybe_ok(self) -> None:
-        exp = make("f").returns("x").once().maybe()
-        assert exp.is_optional() is True
+        assert make("f").returns("x").once().maybe().is_optional() is True
 
     def test_maybe_then_once_ok(self) -> None:
-        exp = make("f").returns("x").maybe().once()
-        assert exp.is_quantifier_locked is True
+        assert make("f").returns("x").maybe().once().is_quantifier_locked is True
 
     def test_times_zero_raises(self) -> None:
         with pytest.raises(ConfigurationError):
@@ -576,8 +582,7 @@ class TestConfigurationErrors:
 
 class TestCallCount:
     def test_zero_initially(self) -> None:
-        exp = make("f").at_least(1)
-        assert exp.call_count == 0
+        assert make("f").at_least(1).call_count == 0
 
     def test_increments_per_consume(self) -> None:
         exp = make("f").returns("x").at_least(1)
@@ -594,23 +599,18 @@ class TestCallCount:
 
 class TestRepr:
     def test_contains_method_name(self) -> None:
-        exp = make("my_method")
-        assert "my_method" in repr(exp)
+        assert "my_method" in repr(make("my_method"))
 
     def test_contains_positional_args(self) -> None:
-        exp = make("f", 1, "hello")
-        r = repr(exp)
-        assert "1" in r
-        assert "'hello'" in r
+        result = repr(make("f", 1, "hello"))
+        assert "1" in result
+        assert "'hello'" in result
 
     def test_contains_kwargs(self) -> None:
-        exp = Expectation("f", (), {"key": 42})
-        assert "key=42" in repr(exp)
+        assert "key=42" in repr(Expectation("f", (), {"key": 42}))
 
     def test_contains_any_args_sentinel(self) -> None:
-        exp = Expectation("f", (ANY_ARGS,), {})
-        assert "ANY_ARGS" in repr(exp)
+        assert "ANY_ARGS" in repr(Expectation("f", (ANY_ARGS,), {}))
 
     def test_contains_any_kwargs_sentinel(self) -> None:
-        exp = Expectation("f", (ANY_KWARGS,), {})
-        assert "ANY_KWARGS" in repr(exp)
+        assert "ANY_KWARGS" in repr(Expectation("f", (ANY_KWARGS,), {}))

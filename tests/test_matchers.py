@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from dmock import (
     ANY_ARGS,
     ANY_KWARGS,
@@ -17,17 +19,9 @@ from dmock._matchers import (
 
 
 class TestAnything:
-    def test_matches_int(self) -> None:
-        assert Anything.matches(42) is True
-
-    def test_matches_string(self) -> None:
-        assert Anything.matches("hello") is True
-
-    def test_matches_none(self) -> None:
-        assert Anything.matches(None) is True
-
-    def test_matches_list(self) -> None:
-        assert Anything.matches([1, 2, 3]) is True
+    @pytest.mark.parametrize("value", [42, "hello", None, [1, 2, 3]])
+    def test_matches_any_value(self, value: object) -> None:
+        assert Anything.matches(value) is True
 
     def test_call_returns_same_instance(self) -> None:
         assert Anything() is Anything
@@ -75,13 +69,12 @@ class TestMatchedBy:
     def test_rejects_falsy_predicate(self) -> None:
         assert MatchedBy(lambda x: x > 0).matches(-1) is False
 
-    def test_with_named_function(self) -> None:
+    @pytest.mark.parametrize(("value", "expected"), [(4, True), (3, False)])
+    def test_with_named_function(self, value: int, expected: bool) -> None:
         def is_even(x: object) -> bool:
             return isinstance(x, int) and x % 2 == 0
 
-        m = MatchedBy(is_even)
-        assert m.matches(4) is True
-        assert m.matches(3) is False
+        assert MatchedBy(is_even).matches(value) is expected
 
     def test_repr_contains_predicate(self) -> None:
         def my_pred(x: object) -> bool:
@@ -104,10 +97,10 @@ class TestSentinels:
         assert type(ANY_ARGS) is _AnyArgsSentinel
 
     def test_any_args_not_matcher(self) -> None:
-        assert not isinstance(ANY_ARGS, Matcher)
+        assert isinstance(ANY_ARGS, Matcher) is False
 
     def test_any_kwargs_not_matcher(self) -> None:
-        assert not isinstance(ANY_KWARGS, Matcher)
+        assert isinstance(ANY_KWARGS, Matcher) is False
 
     def test_any_args_is_sentinel_type(self) -> None:
         assert isinstance(ANY_ARGS, _AnyArgsSentinel)
