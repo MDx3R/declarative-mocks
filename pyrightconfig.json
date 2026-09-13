@@ -1,5 +1,5 @@
 {
-  "include": ["src"],
+  "include": ["src", "tests"],
   "typeCheckingMode": "strict",
   "pythonVersion": "3.11",
   "reportMissingTypeStubs": "warning",

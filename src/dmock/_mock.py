@@ -1,65 +1,31 @@
 from __future__ import annotations
 
 import inspect
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, assert_never
 from unittest.mock import AsyncMock, Mock
 
 from dmock._exceptions import (
+    BlockedCallError,
     ConfigurationError,
-    UnexpectedCallError,
+    NoMatchingCallError,
+    UnregisteredCallError,
     UnsatisfiedExpectationError,
 )
 from dmock._expectation import Expectation
-from dmock._types import DefaultOutcome, RaiseOutcome, ReturnOutcome, RunOutcome
-
-
-if TYPE_CHECKING:
-    from dmock._types import Outcome
-
-
-def _find_expectation(
-    expectations: list[Expectation],
-    name: str,
-    args: tuple[object, ...],
-    kwargs: dict[str, object],
-) -> Expectation | None:
-    for exp in expectations:
-        if exp.method_name != name:
-            continue
-        if exp.is_exhausted():
-            continue
-        if exp.matches(args, kwargs):
-            return exp
-    return None
-
-
-def _apply_outcome(
-    outcome: Outcome,
-    mock: Mock,
-    name: str,
-    args: tuple[object, ...],
-    kwargs: dict[str, object],
-) -> object:
-    match outcome:
-        case ReturnOutcome():
-            return outcome.value
-        case RaiseOutcome():
-            exc = outcome.exception
-            raise (exc() if isinstance(exc, type) else exc)
-        case RunOutcome():
-            return outcome.func(*args, **kwargs)
-        case DefaultOutcome():
-            return getattr(mock, name)(*args, **kwargs)
-        case _:
-            assert_never(outcome)
-
-
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
+from dmock._types import (
+    DefaultOutcome,
+    RaiseOutcome,
+    RecordedCall,
+    ReturnOutcome,
+    RunOutcome,
+)
 
 
 if TYPE_CHECKING:
     from typing import Any
+
+    from dmock._types import Outcome
 
     class _Base(Any):  # type: ignore[misc]
         pass
@@ -70,60 +36,167 @@ else:
         pass
 
 
+@dataclass(frozen=True, slots=True)
+class _ExpectationLookup:
+    matched: Expectation | None
+    rejected: tuple[Expectation, ...]
+
+
+def _is_dunder(name: str) -> bool:
+    return name.startswith("__") and name.endswith("__")
+
+
+_RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"})
+
+
 class DeclarativeMock(_Base):
-    """Whitelist proxy over unittest.mock.Mock with a fluent expectation DSL."""
+    """Whitelist proxy over ``unittest.mock.Mock`` with a fluent expectation DSL.
+
+    Every spec method must be registered with :meth:`expect` before it is
+    called. Dunder methods fall through to the internal ``Mock`` unless
+    registered. The names ``expect``, ``property``, and ``verify`` are
+    reserved: a spec that defines any of them raises
+    :class:`~dmock.ConfigurationError` at construction.
+
+    Args:
+        spec: Class or protocol whose attributes are allowed. Positional-only.
+        **kwargs: Forwarded to ``unittest.mock.Mock``.
+
+    Examples:
+        >>> from dmock import DeclarativeMock
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", "a").returns("A").once()
+        Expectation(fetch('a'))
+        >>> mock.fetch("a")
+        'A'
+        >>> mock.verify()
+        >>> mock
+        DeclarativeMock(spec=Service)
+    """
 
     def __init__(self, spec: type, /, **kwargs: object) -> None:
         self._mock: Mock = Mock(spec=spec, **kwargs)
+        colliding = sorted(
+            name for name in _RESERVED_DSL_NAMES if hasattr(self._mock, name)
+        )
+        if colliding:
+            names = ", ".join(repr(name) for name in colliding)
+            raise ConfigurationError(
+                f"Spec {spec.__name__!r} defines reserved DSL name(s) {names}. "
+                "Rename those attributes on the spec, or wrap a protocol without them."
+            )
+
         self._expectations: list[Expectation] = []
         self._hooked: set[str] = set()
         self._properties: dict[str, object] = {}
+        self._calls: list[RecordedCall] = []
 
     # -- Public DSL --
 
     def expect(self, name: str, /, *args: object, **kwargs: object) -> Expectation:
-        """Register an expectation for attribute *name* on the spec.
+        """Register an expectation for attribute `name` on the spec.
 
-        Raises AttributeError if *name* is not on the spec.
-        Raises ConfigurationError if *name* is already registered as a property stub.
-        Returns an Expectation builder for chaining outcomes and quantifiers.
+        Absence of `*args` and `**kwargs` means a call with no arguments, not
+        a wildcard. Use matchers such as :data:`~dmock.Anything` or
+        :data:`~dmock.ANY_ARGS` to accept varying values.
+
+        Args:
+            name: Spec attribute to intercept. Positional-only.
+            *args: Expected positional arguments, possibly matchers.
+            **kwargs: Expected keyword arguments, possibly matchers.
+
+        Returns:
+            An :class:`~dmock.Expectation` for chaining outcomes and
+            quantifiers.
+
+        Raises:
+            AttributeError: If `name` is not on the spec.
+            ConfigurationError: If `name` is already a :meth:`property` stub.
+
+        Examples:
+            >>> from dmock import DeclarativeMock
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str: ...
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.expect("fetch", "a").returns("A")
+            Expectation(fetch('a'))
+            >>> mock.fetch("a")
+            'A'
         """
         getattr(self._mock, name)  # spec validation
         if name in self._properties:
             raise ConfigurationError(
                 f"Cannot register expectation for {name!r}: "
-                f"a property stub is already registered for this name."
+                "a property stub is already registered for this name."
             )
+
         exp = Expectation(name, args, kwargs)
         self._expectations.append(exp)
         self._hooked.add(name)
         return exp
 
     def property(self, name: str, value: object, /) -> None:
-        """Register a stub attribute *name* that returns *value* on access.
+        """Register a stub attribute `name` that returns `value` on access.
 
-        Raises AttributeError if *name* is not on the spec.
-        Raises ConfigurationError if *name* is already registered via expect().
-        No quantifier tracking; always considered satisfied.
+        No call is required. Property stubs have no quantifiers and are not
+        checked by :meth:`verify`.
+
+        Args:
+            name: Spec attribute to stub. Positional-only.
+            value: Object returned on attribute access. Positional-only.
+
+        Raises:
+            AttributeError: If `name` is not on the spec.
+            ConfigurationError: If `name` is already registered via
+                :meth:`expect`.
+
+        Examples:
+            >>> from dmock import DeclarativeMock
+            >>> class Service:
+            ...     value = 0
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.property("value", 123)
+            >>> mock.value
+            123
+            >>> mock.verify()
         """
         getattr(self._mock, name)  # spec validation
         if name in self._hooked:
             raise ConfigurationError(
                 f"Cannot register property {name!r}: "
-                f"an expectation is already registered for this name."
+                "an expectation is already registered for this name."
             )
+
         self._properties[name] = value
 
     def verify(self) -> None:
-        """Verify all registered expectations are satisfied.
+        """Verify that every registered expectation meets its quantifier.
 
-        Raises UnsatisfiedExpectationError listing every unsatisfied expectation.
+        Raises:
+            UnsatisfiedExpectationError: One or more expectations are unmet.
+                The message lists each as ``expected <constraint>, got <n>``
+                and includes the call history when any calls were dispatched.
+
+        Examples:
+            >>> from dmock import DeclarativeMock, UnsatisfiedExpectationError
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str: ...
+            >>> mock = DeclarativeMock(Service)
+            >>> mock.expect("fetch", "a").returns("A").once()
+            Expectation(fetch('a'))
+            >>> try:
+            ...     mock.verify()
+            ... except UnsatisfiedExpectationError as exc:
+            ...     "expected exactly 1 call(s), got 0" in str(exc)
+            True
         """
         unsatisfied = [e for e in self._expectations if not e.is_satisfied()]
         if not unsatisfied:
             return
-        lines = "\n".join(f"  {e!r}" for e in unsatisfied)
-        raise UnsatisfiedExpectationError(f"Unsatisfied expectations:\n{lines}")
+
+        raise UnsatisfiedExpectationError(unsatisfied, self._calls)
 
     # -- Interception --
 
@@ -131,12 +204,12 @@ class DeclarativeMock(_Base):
         mock_attr = getattr(self._mock, name)  # AttributeError if not on spec
         if _is_dunder(name):
             return mock_attr
+
         if name in self._properties:
             return self._properties[name]
+
         if name not in self._hooked:
-            raise UnexpectedCallError(
-                f"Unexpected call: {name!r} has no registered expectation."
-            )
+            raise UnregisteredCallError(name, self._calls)
 
         if isinstance(mock_attr, AsyncMock):
 
@@ -147,30 +220,69 @@ class DeclarativeMock(_Base):
                 return result
 
             return async_dispatcher
-        else:
 
-            def dispatcher(*args: object, **kwargs: object) -> object:
-                return self._dispatch(name, *args, **kwargs)
+        def dispatcher(*args: object, **kwargs: object) -> object:
+            return self._dispatch(name, *args, **kwargs)
 
-            return dispatcher
+        return dispatcher
 
     # -- Internal dispatch --
 
     def _dispatch(self, name: str, /, *args: object, **kwargs: object) -> object:
-        exp = _find_expectation(self._expectations, name, args, kwargs)
-        if exp is None:
-            raise UnexpectedCallError(
-                f"Unexpected call: {name!r} called with args={args!r}, kwargs={kwargs!r} "
-                f"- no matching non-exhausted expectation."
-            )
-        for req in exp.requires:
-            if not req.is_satisfied():
-                raise UnexpectedCallError(
-                    f"Out-of-order call: {name!r} requires {req.method_name!r} "
-                    f"to be satisfied first (call count: {req.call_count})."
-                )
-        outcome = exp.consume()
-        return _apply_outcome(outcome, self._mock, name, args, kwargs)
+        call = RecordedCall(name, args, dict(kwargs))
+        self._calls.append(call)
+
+        lookup = self._lookup_expectation(name, args, kwargs)
+        if lookup.matched is None:
+            raise NoMatchingCallError(call, lookup.rejected, self._calls)
+
+        exp = lookup.matched
+        blocked = [req for req in exp.requires if not req.is_satisfied()]
+        if blocked:
+            raise BlockedCallError(call, exp, blocked, self._calls)
+
+        return self._apply_outcome(exp.consume(), name, args, kwargs)
+
+    def _lookup_expectation(
+        self,
+        name: str,
+        args: tuple[object, ...],
+        kwargs: dict[str, object],
+    ) -> _ExpectationLookup:
+        rejected: list[Expectation] = []
+        matched: Expectation | None = None
+        for exp in self._expectations:
+            if exp.method_name != name:
+                continue
+
+            if exp.is_exhausted() or not exp.matches(args, kwargs):
+                rejected.append(exp)
+                continue
+
+            if matched is None:
+                matched = exp
+
+        return _ExpectationLookup(matched, tuple(rejected))
+
+    def _apply_outcome(
+        self,
+        outcome: Outcome,
+        name: str,
+        args: tuple[object, ...],
+        kwargs: dict[str, object],
+    ) -> object:
+        match outcome:
+            case ReturnOutcome():
+                return outcome.value
+            case RaiseOutcome():
+                exc = outcome.exception
+                raise (exc() if isinstance(exc, type) else exc)
+            case RunOutcome():
+                return outcome.func(*args, **kwargs)
+            case DefaultOutcome():
+                return getattr(self._mock, name)(*args, **kwargs)
+            case _:
+                assert_never(outcome)
 
     def __repr__(self) -> str:
         spec_name = getattr(self._mock, "_spec_class", type(None)).__name__
