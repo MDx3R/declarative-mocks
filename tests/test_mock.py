@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
 from unittest.mock import MagicMock, Mock, NonCallableMagicMock
 
@@ -662,6 +663,17 @@ class TestReservedDslNames:
 
 
 class TestAsyncDispatch:
+    def test_async_method_is_coroutine_function(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect("aprocess_order", 1).returns("ok")
+
+        # Act
+        result = inspect.iscoroutinefunction(mock.aprocess_order)
+
+        # Assert
+        assert result is True
+
     async def test_async_raises_exception(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
