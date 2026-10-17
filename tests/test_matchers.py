@@ -169,7 +169,7 @@ class TestEquals:
 
     def test_equality_is_symmetric(self) -> None:
         assert Equals("a") == "a"
-        assert Equals("a") == "a"
+        assert "a" == Equals("a")  # noqa: SIM300
 
     def test_repr(self) -> None:
         assert repr(Equals("a")) == "Equals('a')"
@@ -185,13 +185,17 @@ class TestNot:
     def test_rejects_equal_value(self) -> None:
         assert Not("a").matches("a") is False
 
-    def test_invert_negates_matcher(self) -> None:
+    def test_invert_matches_different_value(self) -> None:
         assert (~Equals("a")) == "b"
+
+    def test_invert_rejects_equal_value(self) -> None:
         assert (~Equals("a")) != "a"
+
+    def test_invert_repr(self) -> None:
+        assert repr(~Equals("a")) == "Not(Equals('a'))"
 
     def test_repr(self) -> None:
         assert repr(Not("a")) == "Not('a')"
-        assert repr(~Equals("a")) == "Not(Equals('a'))"
 
     def test_satisfies_matcher_protocol(self) -> None:
         assert isinstance(Not("a"), Matcher)
@@ -242,26 +246,31 @@ class TestTruthyAndFalsy:
     def test_falsy_matches(self, value: object) -> None:
         assert FALSY.matches(value) is True
 
-    def test_falsy_rejects_truthy(self) -> None:
-        assert FALSY.matches("a") is False
+    @pytest.mark.parametrize("value", ["a", 1, [0]])
+    def test_falsy_rejects_truthy(self, value: object) -> None:
+        assert FALSY.matches(value) is False
 
     def test_truthy_repr(self) -> None:
         assert repr(TRUTHY) == "MatchedBy(<class 'bool'>)"
 
 
 class TestDatetimeMatchers:
-    def test_naive_datetime(self) -> None:
-        naive = datetime(2020, 1, 1)
-        aware = datetime(2020, 1, 1, tzinfo=UTC)
-        assert NAIVE_DATETIME.matches(naive) is True
-        assert NAIVE_DATETIME.matches(aware) is False
+    def test_naive_matches_naive_datetime(self) -> None:
+        assert NAIVE_DATETIME.matches(datetime(2020, 1, 1)) is True
+
+    def test_naive_rejects_aware_datetime(self) -> None:
+        assert NAIVE_DATETIME.matches(datetime(2020, 1, 1, tzinfo=UTC)) is False
+
+    def test_naive_rejects_non_datetime(self) -> None:
         assert NAIVE_DATETIME.matches("2020-01-01") is False
 
-    def test_aware_datetime(self) -> None:
-        naive = datetime(2020, 1, 1)
-        aware = datetime(2020, 1, 1, tzinfo=UTC)
-        assert AWARE_DATETIME.matches(aware) is True
-        assert AWARE_DATETIME.matches(naive) is False
+    def test_aware_matches_aware_datetime(self) -> None:
+        assert AWARE_DATETIME.matches(datetime(2020, 1, 1, tzinfo=UTC)) is True
+
+    def test_aware_rejects_naive_datetime(self) -> None:
+        assert AWARE_DATETIME.matches(datetime(2020, 1, 1)) is False
+
+    def test_aware_rejects_non_datetime(self) -> None:
         assert AWARE_DATETIME.matches(None) is False
 
 
@@ -272,7 +281,7 @@ class TestEmpty:
 
     @pytest.mark.parametrize("value", ["a", [1], None, 0])
     def test_rejects_non_empty_or_unsized(self, value: object) -> None:
-        assert EMPTY.matches(value) is False
+        assert Empty().matches(value) is False
 
     def test_empty_constant_is_an_empty_matcher(self) -> None:
         assert isinstance(EMPTY, Empty)
@@ -400,6 +409,8 @@ class TestApprox:
 
     def test_absolute_tolerance(self) -> None:
         assert Approx(1.0, rel_tol=0, abs_tol=0.1).matches(1.05) is True
+
+    def test_rejects_outside_absolute_tolerance(self) -> None:
         assert Approx(1.0, rel_tol=0, abs_tol=0.1).matches(1.2) is False
 
     def test_rejects_non_float(self) -> None:
@@ -446,6 +457,8 @@ class TestRegex:
 
     def test_match_from_start(self) -> None:
         assert RegexMatch(r"k.*").matches("key") is True
+
+    def test_match_rejects_pattern_past_the_start(self) -> None:
         assert RegexMatch(r"ey").matches("key") is False
 
     def test_search_anywhere(self) -> None:
@@ -453,15 +466,25 @@ class TestRegex:
 
     def test_fullmatch_whole_string(self) -> None:
         assert RegexFullmatch(r"k.y").matches("key") is True
+
+    def test_fullmatch_rejects_extra_characters(self) -> None:
         assert RegexFullmatch(r"k.y").matches("key!") is False
 
-    def test_rejects_non_string(self) -> None:
-        assert RegexMatch("a").matches(1) is False
-        assert RegexSearch("a").matches(None) is False
-        assert RegexFullmatch("a").matches(b"a") is False
+    @pytest.mark.parametrize(
+        ("matcher", "value"),
+        [
+            (RegexMatch("a"), 1),
+            (RegexSearch("a"), None),
+            (RegexFullmatch("a"), b"a"),
+        ],
+    )
+    def test_rejects_non_string(self, matcher: Matcher, value: object) -> None:
+        assert matcher.matches(value) is False
 
     def test_ignore_case_flag(self) -> None:
         assert RegexMatch("a", re.IGNORECASE).matches("A") is True
+
+    def test_match_is_case_sensitive(self) -> None:
         assert RegexMatch("a").matches("A") is False
 
     def test_compiled_pattern(self) -> None:
@@ -487,44 +510,87 @@ class TestRegex:
         assert repr(matcher) == text
 
 
-class TestAndOr:
-    def test_and_requires_every_argument(self) -> None:
-        matcher = And(GreaterThan(0), LessThan(10))
-        assert matcher.matches(5) is True
-        assert matcher.matches(0) is False
+class TestAnd:
+    def test_matches_when_every_argument_matches(self) -> None:
+        assert And(GreaterThan(0), LessThan(10)).matches(5) is True
 
-    def test_or_requires_any_argument(self) -> None:
-        assert Or("a", "b").matches("b") is True
-        assert Or("a", "b").matches("c") is False
+    def test_rejects_when_an_argument_does_not_match(self) -> None:
+        assert And(GreaterThan(0), LessThan(10)).matches(0) is False
 
-    def test_plain_object_reflected_equality(self) -> None:
-        assert Or(1, 2) == 1
-        assert Or(1, 2) != 3
+    def test_equality_is_reflected(self) -> None:
+        assert And(1, 1) == 1
+        assert 1 == And(1, 1)  # noqa: SIM300
+        assert And(1, 2) != 1
 
-    def test_and_operator_wraps_plain_value(self) -> None:
-        assert (
-            repr(GreaterThan(0) & LessThan(10)) == "And(GreaterThan(0), LessThan(10))"
-        )
-        assert repr(1 & Equals(1)) == "And(Equals(1), Equals(1))"
-        assert (1 & Equals(1)) == 1
+    def test_operator_combines_matchers(self) -> None:
+        combined = GreaterThan(0) & LessThan(10)
+        assert repr(combined) == "And(GreaterThan(0), LessThan(10))"
+        assert combined == 5
 
-    def test_or_operator_wraps_plain_value(self) -> None:
-        assert repr(Equals(1) | 2) == "Or(Equals(1), Equals(2))"
-        assert repr(1 | Equals(2)) == "Or(Equals(1), Equals(2))"
-        assert (Equals(1) | 2) == 2
+    def test_operator_wraps_plain_value_on_the_right(self) -> None:
+        combined = Equals(1) & 1
+        assert repr(combined) == "And(Equals(1), Equals(1))"
+        assert combined == 1
 
-    def test_empty_combination(self) -> None:
+    def test_operator_wraps_plain_value_on_the_left(self) -> None:
+        combined = 1 & Equals(1)
+        assert repr(combined) == "And(Equals(1), Equals(1))"
+        assert combined == 1
+
+    def test_reflected_operator_defers_to_matcher_on_the_left(self) -> None:
+        assert Equals(1).__rand__(Equals(2)) is NotImplemented
+
+    def test_empty_matches_any_value(self) -> None:
         assert And().matches(1) is True
-        assert Or().matches(1) is False
 
     def test_repr(self) -> None:
         assert repr(And(1, "a")) == "And(1, 'a')"
+
+
+class TestOr:
+    def test_matches_when_any_argument_matches(self) -> None:
+        assert Or("a", "b").matches("b") is True
+
+    def test_rejects_when_no_argument_matches(self) -> None:
+        assert Or("a", "b").matches("c") is False
+
+    def test_equality_is_reflected(self) -> None:
+        assert Or(1, 2) == 1
+        assert 1 == Or(1, 2)  # noqa: SIM300
+        assert Or(1, 2) != 3
+
+    def test_operator_combines_matchers(self) -> None:
+        combined = Equals(1) | Equals(2)
+        assert repr(combined) == "Or(Equals(1), Equals(2))"
+        assert combined == 2
+
+    def test_operator_wraps_plain_value_on_the_right(self) -> None:
+        combined = Equals(1) | 2
+        assert repr(combined) == "Or(Equals(1), Equals(2))"
+        assert combined == 2
+
+    def test_operator_wraps_plain_value_on_the_left(self) -> None:
+        combined = 1 | Equals(2)
+        assert repr(combined) == "Or(Equals(1), Equals(2))"
+        assert combined == 1
+
+    def test_reflected_operator_defers_to_matcher_on_the_left(self) -> None:
+        assert Equals(1).__ror__(Equals(2)) is NotImplemented
+
+    def test_empty_matches_nothing(self) -> None:
+        assert Or().matches(1) is False
+
+    def test_repr(self) -> None:
         assert repr(Or(1, 2)) == "Or(1, 2)"
 
-    def test_args_is_abstract(self) -> None:
+
+class TestArgs:
+    def test_is_abstract(self) -> None:
         with pytest.raises(TypeError):
             Args(Anything)  # pyright: ignore[reportAbstractUsage]
 
+
+class TestMatcher:
     def test_hash_is_constant(self) -> None:
         assert hash(Equals(1)) == 0
         assert hash(Anything) == 0
