@@ -1,7 +1,7 @@
-[![Checks](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml/badge.svg)](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/declarative-mocks.svg)](https://pypi.org/project/declarative-mocks/)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+![Checks](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml/badge.svg)
+![PyPI](https://img.shields.io/pypi/v/declarative-mocks.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
 # declarative-mocks
 
@@ -11,7 +11,7 @@
 
 ---
 
-- **Fluent expectations** - register calls with arguments (positional vs keyword aware), matchers (`Anything`, `ANY_ARGS` / `ANY_KWARGS`, …), and outcomes in order.
+- **Fluent expectations** - register calls with arguments (positional vs keyword aware), matchers (`Anything`, `ANY_ARGS` / `ANY_KWARGS` and many more!), and outcomes in order.
 - **Return sequences** - chain multiple `.returns()` / `.raises()` / `.runs()` for successive matching calls.
 - **Call-count controls** - one quantifier per `expect(...)` (`.once()`, `.times(n)`, `.between(min, max)`, `.never()`, and more).
 - **Spec-backed mocks** - aligned with `Mock(spec=…)` semantics for safer, clearer tests.
@@ -30,7 +30,7 @@ pip install declarative-mocks
 
 ---
 
-**Before - `unittest.mock`:** behavior is spread across `return_value`, `side_effect`, and ad hoc assertions; ordering and “what happens on the third call?” are easy to lose in a long test.
+**Before -** `unittest.mock`**:** behavior is spread across `return_value`, `side_effect`, and ad hoc assertions; ordering and “what happens on the third call?” are easy to lose in a long test.
 
 ```python
 from unittest.mock import Mock
@@ -45,7 +45,7 @@ service.fetch_user.side_effect = [
 # Assertions about call order and counts are often manual and verbose.
 ```
 
-**After - `dmock`:** the same story is **declared** next to the mock: ordered expectations, explicit outcomes, and a single verification step.
+**After -** `dmock`**:** the same story is **declared** next to the mock: ordered expectations, explicit outcomes, and a single verification step.
 
 ```python
 from dmock import DeclarativeMock
@@ -67,7 +67,7 @@ The goals are the same as above: a strictly typed expectation DSL, a whitelist m
 
 That only matters if you type-check tests. Tests deserve the same quality bar as production code - maybe more, now that agents write so much of the suite.
 
-`mockito-python` is strong on features, but the installed package has **no `py.typed` marker and no `.pyi` stubs**. Then `mypy tests` fails on `import mockito` (`missing library stubs or py.typed marker`) unless you set `ignore_missing_imports = True`. That is [issue #58](https://github.com/kaste/mockito-python/issues/58): the reporter was already ignoring the package; the maintainer called full typing “some significant work.” The ignore makes mypy succeed by treating mockito as `Any`, so `when` / `thenReturn` / `verify` themselves are not checked.
+`mockito-python` is strong on features, but the installed package has **no** `py.typed` **marker and no** `.pyi` **stubs**. Then `mypy tests` fails on `import mockito` (`missing library stubs or py.typed marker`) unless you set `ignore_missing_imports = True`. That is [issue #58](https://github.com/kaste/mockito-python/issues/58): the reporter was already ignoring the package; the maintainer called full typing “some significant work.” The ignore makes mypy succeed by treating mockito as `Any`, so `when` / `thenReturn` / `verify` themselves are not checked.
 
 `flexmock` **is** typed (`py.typed` since 0.11.3), but it addresses methods **by string** (`should_receive("fetch_user")`), so the name is still not checked statically.
 
@@ -201,14 +201,14 @@ mock.expect("aprocess_order", Anything()).runs(async_fn)
 assert await mock.aprocess_order(9) == "async-9"
 ```
 
-For full DSL details and edge cases, see **`SPEC.md`** and **`REFERENCE.md`**.
+For full DSL details and edge cases, see `SPEC.md` and `REFERENCE.md`.
 
 ## Limitations & non-goals
 
 ---
 
 - **No signature binding.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature.
-- **No automatic `verify()`.** You call `verify()` yourself (a pytest hook is on the roadmap).
+- **No automatic** `verify()`**.** You call `verify()` yourself (a pytest hook is on the roadmap).
 - **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Construct a `DeclarativeMock` and pass it in.
 - **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
 
@@ -218,9 +218,8 @@ For full DSL details and edge cases, see **`SPEC.md`** and **`REFERENCE.md`**.
 
 After 0.1.0, in no particular order:
 
-- **pytest auto-`verify()`** - a plugin or fixture that runs `verify()` at the end of each test (gomock-style `Finish` on teardown), so you do not have to remember the call.
+- **pytest auto-**`verify()` - a plugin or fixture that runs `verify()` at the end of each test (gomock-style `Finish` on teardown), so you do not have to remember the call.
 - **Per-outcome counts (maybe)** - repeat a `.returns()` / `.raises()` / `.runs()` without chaining it n times (today `.returns(1).returns(1).returns(1).returns(2)`).
-- **Rich matchers** - more than `Anything` / `AnythingOfType` / `MatchedBy`: regex, numeric bounds, datetime (and ISO strings), containers, truthy/falsy, plus `and` / `or` / `not`. In the spirit of [anys](https://github.com/jwodder/anys).
 
 Other ideas belong in GitHub Issues.
 
