@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0] - 2026-10-18
+
+- Value, container, ordering, and text matchers, including `Equals`, `Contains`, `Range`, `LessThan`, `GreaterThan`, `Approx`, `StartsWith`, `Regex`, `TRUTHY`, `And`, and `Or`.
+- Matcher operators: `==` and `!=` compare through `matches`, `~` is `Not`, and `&` / `|` build `And` / `Or`.
+- README usage examples and the REFERENCE matcher catalog.
+
 ## [0.1.1] - 2026-09-13
 
 - Document PyPI installation (`pip install declarative-mocks`) and add a version badge. This is a docs-only release so the project page matches GitHub.
