@@ -15,6 +15,7 @@ from dmock import (
     AnythingOfType,
     ConfigurationError,
     DeclarativeMock,
+    LessThan,
     MatchedBy,
     UnexpectedCallError,
     UnsatisfiedExpectationError,
@@ -582,6 +583,21 @@ class TestMatchersThroughDispatch:
 
         # Assert
         assert result == "hello"
+
+    def test_later_matcher_runs_only_after_earlier_expectation_is_exhausted(
+        self,
+    ) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect("do_something", "x").returns("exact")
+        mock.expect("do_something", LessThan(3)).returns("small")
+
+        # Act
+        mock.do_something("x")
+
+        # Assert
+        with pytest.raises(TypeError):
+            mock.do_something("x")
 
 
 # ---------------------------------------------------------------------------

@@ -249,20 +249,12 @@ class DeclarativeMock(_Base):
         args: tuple[object, ...],
         kwargs: dict[str, object],
     ) -> _ExpectationLookup:
-        rejected: list[Expectation] = []
-        matched: Expectation | None = None
-        for exp in self._expectations:
-            if exp.method_name != name:
-                continue
+        candidates = tuple(e for e in self._expectations if e.method_name == name)
+        for exp in candidates:
+            if not exp.is_exhausted() and exp.matches(args, kwargs):
+                return _ExpectationLookup(exp, ())
 
-            if exp.is_exhausted() or not exp.matches(args, kwargs):
-                rejected.append(exp)
-                continue
-
-            if matched is None:
-                matched = exp
-
-        return _ExpectationLookup(matched, tuple(rejected))
+        return _ExpectationLookup(None, candidates)
 
     def _apply_outcome(
         self,
