@@ -16,7 +16,7 @@ The library provides a **declarative** layer over `unittest.mock` (typically `Mo
 
 ## Expectation registration
 
-- `expect(name, …)` registers an expectation for an attribute (usually a method name) on the mock.
+- `expect(name, …)` registers an expectation for an attribute on the mock. `name` is a string or the unbound method or property from the spec class (`Service.fetch`). A string does not select argument or outcome types. A method or property lets a type checker check the expected arguments and the chained outcomes against that attribute. At runtime both forms only check that the attribute exists on the spec.
 - Arguments after the name describe **expected** call arguments (positional and keyword), possibly using matchers.
 - Multiple `returns(…)`, `raises(…)`, or `runs(…)` on one expectation define a **sequence** of outcomes for successive matching calls. Order of chained outcomes matters. `.runs(fn).returns(value)` is two calls, not a side effect plus a return on the same call.
 
@@ -42,7 +42,7 @@ When the quantifier allows more calls than there are outcomes, the **last** outc
 
 ## Property stubs
 
-- `property(name, value)` registers a **stub attribute** that returns `value` directly when the attribute is accessed on the mock (no call required).
+- `property(name, value)` registers a **stub attribute** that returns `value` directly when the attribute is accessed on the mock (no call required). `name` is a string or the property (or other spec attribute) object. A property object lets a type checker check `value` against the property's type. A string leaves `value` unchecked.
 - Same spec-validation as `expect()`: raises `AttributeError` if `name` is not on the spec.
 - Property stubs have no quantifier tracking and are always considered satisfied; `verify()` ignores them.
 - Registering a property stub for a name that already has an `expect()` registration (or vice versa) raises `ConfigurationError` immediately at configuration time.
@@ -81,7 +81,7 @@ Cross-mock dependencies (prerequisites on a different `DeclarativeMock` instance
 
 ## Non-goals
 
-- No signature binding: `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature.
+- No signature binding at runtime: `expect` checks that the attribute exists on the spec, not that the argument list matches the real signature. When `name` is a method or property object, type checkers check arguments and outcomes statically.
 - No automatic `verify()` at teardown.
 - No spies and no patching of live objects, modules, or `sys.modules`.
 - Not thread-safe.

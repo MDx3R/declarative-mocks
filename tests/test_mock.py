@@ -19,6 +19,7 @@ from dmock import (
     MatchedBy,
     UnexpectedCallError,
     UnsatisfiedExpectationError,
+    dmock,
     in_order,
 )
 from dmock._exceptions import (
@@ -46,6 +47,26 @@ class MyService(ABC):
     @property
     def value(self) -> int:
         raise NotImplementedError
+
+
+# ---------------------------------------------------------------------------
+# dmock()
+# ---------------------------------------------------------------------------
+
+
+class TestDmockFactory:
+    def test_returns_a_working_mock_of_the_spec(self) -> None:
+        # Arrange
+        mock = dmock(MyService)
+        mock.expect("process_order", 123).returns("ok")
+
+        # Act
+        result = mock.process_order(123)
+
+        # Assert
+        assert isinstance(mock, DeclarativeMock)
+        assert repr(mock) == "DeclarativeMock(spec=MyService)"
+        assert result == "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -96,10 +117,11 @@ class TestBasicDispatch:
 
     def test_runs_callable_receives_call_args(self) -> None:
         # Arrange
-        received: list[object] = []
+        received: list[str] = []
 
-        def capture(name: object) -> None:
+        def capture(name: str) -> str:
             received.append(name)
+            return name
 
         mock = DeclarativeMock(MyService)
         mock.expect("greet", Anything()).runs(capture)
@@ -113,9 +135,11 @@ class TestBasicDispatch:
     def test_runs_returns_callable_result(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
-        mock.expect("greet", Anything()).runs(
-            lambda name: name.upper()  # pyright: ignore
-        )
+
+        def upper(name: str) -> str:
+            return name.upper()
+
+        mock.expect("greet", Anything()).runs(upper)
 
         # Act
         result = mock.greet("hi")
@@ -560,6 +584,32 @@ class TestMatchersThroughDispatch:
         # Assert
         assert result == "wild"
 
+    @pytest.mark.parametrize("order_id", [1, 2])
+    def test_any_args_and_specific_kwargs_dispatches(self, order_id: int) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect("process_order", ANY_ARGS, order_id=order_id).returns(
+            "wild"
+        ).at_least(1)
+
+        # Act
+        result = mock.process_order(123, order_id=order_id)
+
+        # Assert
+        assert result == "wild"
+
+    @pytest.mark.parametrize("order_id", [1, 2])
+    def test_any_kwargs_and_specific_args_dispatches(self, order_id: int) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect("process_order", order_id, ANY_KWARGS).returns("wild").at_least(1)
+
+        # Act
+        result = mock.process_order(order_id, kwarg=123)
+
+        # Assert
+        assert result == "wild"
+
     def test_matched_by_dispatches(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
@@ -702,9 +752,11 @@ class TestAsyncDispatch:
     async def test_async_runs_sync_callable(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
-        mock.expect("aprocess_order", Anything()).runs(
-            lambda x: f"sync-{x}"  # pyright: ignore
-        )
+
+        def sync_label(order_id: int) -> str:
+            return f"sync-{order_id}"
+
+        mock.expect("aprocess_order", Anything()).runs(sync_label)
 
         # Act
         result = await mock.aprocess_order(7)
@@ -832,6 +884,44 @@ class TestPropertySupport:
         with pytest.raises(ConfigurationError):
             mock.expect("value")
 
+    def test_expect_unbound_method_uses_its_name(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.process_order, 123).returns("ok")
+
+        # Act
+        result = mock.process_order(123)
+
+        # Assert
+        assert result == "ok"
+
+    def test_property_from_class_uses_getter_name(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.property(MyService.value, 123)
+
+        # Act
+        result = mock.value
+
+        # Assert
+        assert result == 123
+
+    def test_property_without_getter_raises_configuration_error(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+
+        # Act & Assert
+        with pytest.raises(ConfigurationError, match="no getter"):
+            mock.property(property(), 1)
+
+    def test_expect_without_attribute_name_raises_configuration_error(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+
+        # Act & Assert
+        with pytest.raises(ConfigurationError, match="Cannot resolve"):
+            mock.expect(object())  # type: ignore[call-overload]
+
     def test_multiple_properties_on_different_names(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
@@ -845,6 +935,103 @@ class TestPropertySupport:
         # Assert
         assert value == 42
         assert done == "done"
+
+
+# ---------------------------------------------------------------------------
+# Spec attributes passed to expect / property
+# ---------------------------------------------------------------------------
+
+
+class TestSpecAttributeForms:
+    async def test_expect_async_method_returns_configured_value(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.aprocess_order, 7).returns("ok")
+
+        # Act
+        result = await mock.aprocess_order(7)
+
+        # Assert
+        assert result == "ok"
+
+    def test_expect_method_matches_keyword_argument(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.greet, name="ada").returns("hello")
+
+        # Act
+        result = mock.greet(name="ada")
+
+        # Assert
+        assert result == "hello"
+
+    def test_expect_method_without_arguments(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.do_something).returns("done").once()
+
+        # Act
+        result = mock.do_something()
+
+        # Assert
+        assert result == "done"
+        with pytest.raises(UnexpectedCallError):
+            mock.do_something()
+
+    def test_expect_method_argument_mismatch_raises_unexpected_call(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.process_order, 1).returns("ok")
+
+        # Act & Assert
+        with pytest.raises(UnexpectedCallError):
+            mock.process_order(2)
+
+    def test_expect_method_runs_receives_call_arguments(self) -> None:
+        # Arrange
+        received: list[object] = []
+
+        def capture(name: str) -> str:
+            received.append(name)
+            return "hi"
+
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.greet, Anything()).runs(capture)
+
+        # Act
+        mock.greet("hi")
+
+        # Assert
+        assert received == ["hi"]
+
+    def test_expect_callable_missing_from_spec_raises_attribute_error(self) -> None:
+        # Arrange
+        def missing(self: MyService) -> str:
+            raise NotImplementedError
+
+        mock = DeclarativeMock(MyService)
+
+        # Act & Assert
+        with pytest.raises(AttributeError):
+            mock.expect(missing)
+
+    def test_property_after_method_expectation_raises_configuration_error(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.expect(MyService.do_something).returns("ok")
+
+        # Act & Assert
+        with pytest.raises(ConfigurationError):
+            mock.property("do_something", "stub")
+
+    def test_expect_after_property_object_raises_configuration_error(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        mock.property(MyService.value, 1)
+
+        # Act & Assert
+        with pytest.raises(ConfigurationError):
+            mock.expect("value")
 
 
 # ---------------------------------------------------------------------------

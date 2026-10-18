@@ -81,10 +81,10 @@ class Matcher(ABC, _Base):
     Examples:
         >>> from dmock import DeclarativeMock, Matcher
         >>> class Prefix(Matcher):
-        ...     def __init__(self, prefix: str) -> None:
+        ...     def __init__(self, prefix: str, /) -> None:
         ...         self.prefix = prefix
         ...
-        ...     def matches(self, value: object) -> bool:
+        ...     def matches(self, value: object, /) -> bool:
         ...         return isinstance(value, str) and value.startswith(self.prefix)
         ...
         ...     def __repr__(self) -> str:
@@ -99,7 +99,7 @@ class Matcher(ABC, _Base):
     """
 
     @abstractmethod
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` satisfies this matcher."""
 
     def __eq__(self, value: object, /) -> bool:
@@ -286,7 +286,7 @@ class _AnythingMatcher(Matcher):
         'ok'
     """
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return True for every `value`."""
         return True
 
@@ -323,7 +323,7 @@ class _NeverMatcher(Matcher):
         False
     """
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return False for every `value`."""
         return False
 
@@ -355,10 +355,10 @@ class AnythingOfType(Matcher):
         'ok'
     """
 
-    def __init__(self, expected_type: type) -> None:
+    def __init__(self, expected_type: type, /) -> None:
         self._expected_type = expected_type
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is an instance of the expected type."""
         return isinstance(value, self._expected_type)
 
@@ -386,10 +386,10 @@ class Equals(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: object) -> None:
+    def __init__(self, expected: object, /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` equals `expected`."""
         return value == self._expected
 
@@ -417,10 +417,10 @@ class Not(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: object) -> None:
+    def __init__(self, expected: object, /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is not equal to `expected`."""
         return value != self._expected
 
@@ -446,10 +446,10 @@ class Maybe(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: object) -> None:
+    def __init__(self, expected: object, /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is ``None`` or equals `expected`."""
         return value is None or value == self._expected
 
@@ -477,10 +477,10 @@ class Is(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: object) -> None:
+    def __init__(self, expected: object, /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is `expected`."""
         return value is self._expected
 
@@ -506,10 +506,10 @@ class MatchedBy(Matcher):
         'ok'
     """
 
-    def __init__(self, predicate: Predicate) -> None:
+    def __init__(self, predicate: Predicate, /) -> None:
         self._predicate = predicate
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `predicate` accepts `value`."""
         return self._predicate(value)
 
@@ -610,7 +610,7 @@ class Empty(Matcher):
         'ok'
     """
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` has length zero."""
         if not isinstance(value, Sized):
             return False
@@ -642,10 +642,10 @@ class In(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: Container[object]) -> None:
+    def __init__(self, expected: Container[object], /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is a member of `expected`."""
         return value in self._expected
 
@@ -674,10 +674,10 @@ class Contains(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: object) -> None:
+    def __init__(self, expected: object, /) -> None:
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` contains `expected`."""
         if not isinstance(value, Container):
             return False
@@ -708,10 +708,10 @@ class Includes(Matcher):
         'ok'
     """
 
-    def __init__(self, *items: object) -> None:
+    def __init__(self, /, *items: object) -> None:
         self._items = items
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` contains every item."""
         if not isinstance(value, Container):
             return False
@@ -742,10 +742,10 @@ class Attr(Matcher):
         'ok'
     """
 
-    def __init__(self, attr: str) -> None:
+    def __init__(self, attr: str, /) -> None:
         self._attr = attr
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` has attribute `attr`."""
         return hasattr(value, self._attr)
 
@@ -807,11 +807,11 @@ class Range(Matcher):
         'ok'
     """
 
-    def __init__(self, left: _SupportsLT, right: _SupportsGT) -> None:
+    def __init__(self, left: _SupportsLT, right: _SupportsGT, /) -> None:
         self._left = left
         self._right = right
 
-    def matches(self, value: Any) -> bool:
+    def matches(self, value: Any, /) -> bool:
         """Return whether `value` is strictly inside the interval."""
         return bool(self._left < value < self._right)
 
@@ -839,7 +839,7 @@ class LessThan(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: _SupportsGT) -> None:
+    def __init__(self, expected: _SupportsGT, /) -> None:
         """Accept an exclusive upper bound that supports ``>``.
 
         ``matches`` evaluates ``value < expected``. When `value` does not
@@ -850,7 +850,7 @@ class LessThan(Matcher):
         """
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is less than `expected`."""
         return value < self._expected
 
@@ -878,7 +878,7 @@ class GreaterThan(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: _SupportsLT) -> None:
+    def __init__(self, expected: _SupportsLT, /) -> None:
         """Accept an exclusive lower bound that supports ``<``.
 
         ``matches`` evaluates ``expected < value``, so `expected` must
@@ -889,7 +889,7 @@ class GreaterThan(Matcher):
         """
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is greater than `expected`."""
         return self._expected < value
 
@@ -917,7 +917,7 @@ class LessEquals(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: _SupportsGE) -> None:
+    def __init__(self, expected: _SupportsGE, /) -> None:
         """Accept an inclusive upper bound that supports ``>=``.
 
         ``matches`` evaluates ``value <= expected``. When `value` does not
@@ -928,7 +928,7 @@ class LessEquals(Matcher):
         """
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is less than or equal to `expected`."""
         return value <= self._expected
 
@@ -956,7 +956,7 @@ class GreaterEquals(Matcher):
         'ok'
     """
 
-    def __init__(self, expected: _SupportsLE) -> None:
+    def __init__(self, expected: _SupportsLE, /) -> None:
         """Accept an inclusive lower bound that supports ``<=``.
 
         ``matches`` evaluates ``expected <= value``, so `expected` must
@@ -967,7 +967,7 @@ class GreaterEquals(Matcher):
         """
         self._expected = expected
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is greater than or equal to `expected`."""
         return self._expected <= value
 
@@ -1001,6 +1001,7 @@ class Approx(Matcher):
     def __init__(
         self,
         expected: SupportsFloat,
+        /,
         rel_tol: SupportsFloat = 1e-9,
         abs_tol: SupportsFloat = 0,
     ) -> None:
@@ -1008,7 +1009,7 @@ class Approx(Matcher):
         self._rel_tol = rel_tol
         self._abs_tol = abs_tol
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is close to `expected`."""
         if not isinstance(value, SupportsFloat):
             return False
@@ -1048,10 +1049,10 @@ class StartsWith(Matcher):
         'ok'
     """
 
-    def __init__(self, prefix: str) -> None:
+    def __init__(self, prefix: str, /) -> None:
         self._prefix = prefix
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is a string starting with `prefix`."""
         return isinstance(value, str) and value.startswith(self._prefix)
 
@@ -1079,10 +1080,10 @@ class EndsWith(Matcher):
         'ok'
     """
 
-    def __init__(self, postfix: str) -> None:
+    def __init__(self, postfix: str, /) -> None:
         self._postfix = postfix
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` is a string ending with `postfix`."""
         return isinstance(value, str) and value.endswith(self._postfix)
 
@@ -1115,12 +1116,12 @@ class RegexMatch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` matches the pattern from the start."""
         if not isinstance(value, str):
             return False
@@ -1157,12 +1158,12 @@ class RegexSearch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether the pattern occurs anywhere in `value`."""
         if not isinstance(value, str):
             return False
@@ -1196,12 +1197,12 @@ class RegexFullmatch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether `value` matches the pattern entirely."""
         if not isinstance(value, str):
             return False
@@ -1231,7 +1232,7 @@ class Args(Matcher):
         True
     """
 
-    def __init__(self, *args: object) -> None:
+    def __init__(self, /, *args: object) -> None:
         self.args = args
 
     def __repr__(self) -> str:
@@ -1260,7 +1261,7 @@ class And(Args):
         'ok'
     """
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether every argument matches `value`."""
         return bool(all(a == value for a in self.args))
 
@@ -1287,6 +1288,6 @@ class Or(Args):
         'ok'
     """
 
-    def matches(self, value: object) -> bool:
+    def matches(self, value: object, /) -> bool:
         """Return whether any argument matches `value`."""
         return bool(any(a == value for a in self.args))

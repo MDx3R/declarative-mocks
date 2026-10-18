@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Generic, Self, final, overload
 
 from dmock._exceptions import ConfigurationError, ExceededCallError
 from dmock._matchers import (
@@ -9,6 +9,7 @@ from dmock._matchers import (
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
     _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )
+from dmock._protocols import P, R
 from dmock._types import (
     AtLeast,
     Between,
@@ -22,7 +23,8 @@ from dmock._types import (
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Awaitable, Callable, Sequence
+    from typing import Any
 
     from dmock._types import Outcome, Quantifier
 
@@ -34,7 +36,8 @@ def _value_matches(expected: object, actual: object) -> bool:
     return expected == actual
 
 
-class Expectation:
+@final
+class Expectation(Generic[P, R]):
     """A single expected call: fluent builder for outcomes and quantifiers.
 
     Constructed by :meth:`~dmock.DeclarativeMock.expect`. Chained ``returns`` /
@@ -71,11 +74,11 @@ class Expectation:
         self._quantifier: Quantifier | None = None
         self._optional: bool = False
         self._calls = 0
-        self._requires: list[Expectation] = []
+        self._requires: list[Expectation[Any, Any]] = []
 
     # -- Fluent outcome builders --
 
-    def returns(self, value: object) -> Self:
+    def returns(self, value: R) -> Self:
         """Declare the return value for the next matching call.
 
         Args:
@@ -121,7 +124,13 @@ class Expectation:
         self._outcomes.append(RaiseOutcome(exc))
         return self
 
-    def runs(self, func: Callable[..., object]) -> Self:
+    @overload
+    def runs(self, func: Callable[P, R]) -> Self: ...
+
+    @overload
+    def runs(self, func: Callable[P, Awaitable[R]]) -> Self: ...
+
+    def runs(self, func: Callable[P, R | Awaitable[R]]) -> Self:
         """Call `func` with the actual arguments for the next matching call.
 
         The return value of `func` becomes the result of that call. Chaining
@@ -327,7 +336,7 @@ class Expectation:
         """
         return self._set_quantifier(Never())
 
-    def not_before(self, *expectations: Expectation) -> Self:
+    def not_before(self, *expectations: Expectation[Any, Any]) -> Self:
         """Require that every `expectations` item is satisfied before this one.
 
         Args:
@@ -364,10 +373,10 @@ class Expectation:
 
         return self
 
-    def _is_reachable_from(self, source: Expectation) -> bool:
+    def _is_reachable_from(self, source: Expectation[Any, Any]) -> bool:
         """Return True if `self` is reachable by following `_requires` from `source`."""
         visited: set[int] = set()
-        queue: deque[Expectation] = deque([source])
+        queue: deque[Expectation[Any, Any]] = deque([source])
         while queue:
             node = queue.popleft()
             node_id = id(node)
@@ -383,7 +392,7 @@ class Expectation:
         return False
 
     @property
-    def requires(self) -> Sequence[Expectation]:
+    def requires(self) -> Sequence[Expectation[Any, Any]]:
         """Prerequisites that must be satisfied before this expectation can match."""
         return self._requires
 
@@ -496,7 +505,7 @@ class Expectation:
         return f"Expectation({self._method_name}({all_parts}))"
 
 
-def in_order(*expectations: Expectation) -> None:
+def in_order(*expectations: Expectation[Any, Any]) -> None:
     """Link `expectations` so each one requires the previous to be satisfied first.
 
     Equivalent to calling ``expectations[i].not_before(expectations[i - 1])``

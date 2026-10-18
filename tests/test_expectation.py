@@ -34,7 +34,9 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def make(name: str = "method", *args: object, **kwargs: object) -> Expectation:
+def make(
+    name: str = "method", *args: object, **kwargs: object
+) -> Expectation[..., object]:
     return Expectation(name, args, kwargs)
 
 
@@ -611,10 +613,10 @@ class TestRepr:
         assert "'hello'" in result
 
     def test_contains_kwargs(self) -> None:
-        assert "key=42" in repr(Expectation("f", (), {"key": 42}))
+        assert "key=42" in repr(make("f", key=42))
 
     def test_contains_any_args_sentinel(self) -> None:
-        assert "ANY_ARGS" in repr(Expectation("f", (ANY_ARGS,), {}))
+        assert "ANY_ARGS" in repr(make("f", ANY_ARGS))
 
     def test_contains_any_kwargs_sentinel(self) -> None:
-        assert "ANY_KWARGS" in repr(Expectation("f", (ANY_KWARGS,), {}))
+        assert "ANY_KWARGS" in repr(make("f", ANY_KWARGS))
