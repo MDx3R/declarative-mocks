@@ -101,32 +101,36 @@ class TestQuantifierTypes:
         assert ExactlyN(3) != ExactlyN(4)
 
     @pytest.mark.parametrize(
-        ("quantifier", "calls", "satisfied", "exhausted"),
+        ("quantifier", "calls", "satisfied", "exhausted", "exceeded"),
         [
-            (ExactlyN(2), 2, True, True),
-            (ExactlyN(2), 1, False, False),
-            (AtLeast(2), 2, True, False),
-            (AtLeast(2), 1, False, False),
-            (AtLeast(2), 100, True, False),
-            (Between(1, 3), 1, True, False),
-            (Between(1, 3), 0, False, False),
-            (Between(1, 3), 3, True, True),
-            (Between(1, 3), 2, True, False),
-            (Between(0, 2), 0, True, False),
-            (Between(0, 2), 2, True, True),
-            (Never(), 0, True, False),
-            (Never(), 1, False, False),
+            (ExactlyN(2), 1, False, False, False),
+            (ExactlyN(2), 2, True, True, False),
+            (ExactlyN(2), 3, True, True, True),
+            (AtLeast(2), 1, False, False, False),
+            (AtLeast(2), 2, True, False, False),
+            (AtLeast(2), 100, True, False, False),
+            (Between(1, 3), 0, False, False, False),
+            (Between(1, 3), 1, True, False, False),
+            (Between(1, 3), 2, True, False, False),
+            (Between(1, 3), 3, True, True, False),
+            (Between(1, 3), 4, True, True, True),
+            (Between(0, 2), 0, True, False, False),
+            (Between(0, 2), 2, True, True, False),
+            (Never(), 0, True, False, False),
+            (Never(), 1, False, False, True),
         ],
     )
-    def test_quantifier_is_satisfied_and_exhausted(
+    def test_quantifier_call_bounds(
         self,
         quantifier: Quantifier,
         calls: int,
         satisfied: bool,
         exhausted: bool,
+        exceeded: bool,
     ) -> None:
         assert quantifier.is_satisfied(calls) is satisfied
         assert quantifier.is_exhausted(calls) is exhausted
+        assert quantifier.is_exceeded(calls) is exceeded
 
     @pytest.mark.parametrize(
         ("quantifier", "expected"),

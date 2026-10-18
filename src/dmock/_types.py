@@ -69,7 +69,20 @@ class Quantifier(Protocol):
         ...
 
     def is_exhausted(self, calls: int) -> bool:
-        """Return True when no further calls are allowed."""
+        """Return True when the dispatcher should stop routing calls here.
+
+        Checked before a call is counted. A quota that is exactly full is
+        exhausted.  An unbounded quantifier never exhausted.
+        """
+        ...
+
+    def is_exceeded(self, calls: int) -> bool:
+        """Return True when `calls` is past the upper bound.
+
+        Checked after the call is counted. The call that fills an exact quota
+        is not exceeded; the next one is. An unbounded quantifier never
+        exceeds.
+        """
         ...
 
     @property
@@ -101,6 +114,9 @@ class ExactlyN:
     def is_exhausted(self, calls: int) -> bool:
         return calls >= self.n
 
+    def is_exceeded(self, calls: int) -> bool:
+        return calls > self.n
+
     @property
     def max_calls(self) -> int:
         return self.n
@@ -124,6 +140,9 @@ class AtLeast:
         return calls >= self.n
 
     def is_exhausted(self, calls: int) -> bool:
+        return False
+
+    def is_exceeded(self, calls: int) -> bool:
         return False
 
     @property
@@ -157,6 +176,9 @@ class Between:
     def is_exhausted(self, calls: int) -> bool:
         return calls >= self.hi
 
+    def is_exceeded(self, calls: int) -> bool:
+        return calls > self.hi
+
     @property
     def max_calls(self) -> int:
         return self.hi
@@ -177,6 +199,9 @@ class Never:
         # Returns False intentionally: the dispatcher must keep this expectation
         # active so that a matching call can be routed here and raise in consume().
         return False
+
+    def is_exceeded(self, calls: int) -> bool:
+        return calls > 0
 
     @property
     def max_calls(self) -> int:

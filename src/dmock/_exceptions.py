@@ -111,7 +111,7 @@ class BlockedCallError(UnexpectedCallError):
 class ExceededCallError(UnexpectedCallError):
     """A matching call exceeded the expectation's quantifier upper bound."""
 
-    def __init__(self, method_name: str, calls: int, max_calls: int) -> None:
+    def __init__(self, method_name: str, calls: int, max_calls: int | None) -> None:
         self.method_name = method_name
         self.calls = calls
         self.max_calls = max_calls
@@ -121,7 +121,7 @@ class ExceededCallError(UnexpectedCallError):
         return (
             f"Unexpected call to {self.method_name!r}: "
             f"called {self.calls} time(s), "
-            f"max allowed is {self.max_calls}."
+            f"max allowed is {self.max_calls or 0}."
         )
 
 

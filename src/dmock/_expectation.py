@@ -454,7 +454,7 @@ class Expectation:
         """
         q = self.quantifier
         self._calls += 1
-        if q.max_calls is not None and self._calls > q.max_calls:
+        if q.is_exceeded(self._calls):
             raise ExceededCallError(self._method_name, self._calls, q.max_calls)
 
         if not self._outcomes:
