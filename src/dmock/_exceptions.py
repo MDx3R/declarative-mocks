@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import Any
 
     from dmock._expectation import Expectation
     from dmock._types import RecordedCall
@@ -44,7 +45,7 @@ class NoMatchingCallError(UnexpectedCallError):
     def __init__(
         self,
         call: RecordedCall,
-        rejected: Sequence[Expectation],
+        rejected: Sequence[Expectation[Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.call = call
@@ -66,7 +67,7 @@ class NoMatchingCallError(UnexpectedCallError):
             self.history,
         )
 
-    def _reason(self, exp: Expectation) -> str:
+    def _reason(self, exp: Expectation[Any, Any]) -> str:
         if exp.is_exhausted():
             maximum = exp.quantifier.max_calls
             bound = "*" if maximum is None else str(maximum)
@@ -81,8 +82,8 @@ class BlockedCallError(UnexpectedCallError):
     def __init__(
         self,
         call: RecordedCall,
-        expectation: Expectation,
-        blocked: Sequence[Expectation],
+        expectation: Expectation[Any, Any],
+        blocked: Sequence[Expectation[Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.call = call
@@ -101,7 +102,7 @@ class BlockedCallError(UnexpectedCallError):
         )
 
     @staticmethod
-    def _blocked_reason(req: Expectation) -> str:
+    def _blocked_reason(req: Expectation[Any, Any]) -> str:
         return (
             f"blocked by {req.method_name} "
             f"(expected {req.quantifier.description}, got {req.call_count})"
@@ -111,7 +112,7 @@ class BlockedCallError(UnexpectedCallError):
 class ExceededCallError(UnexpectedCallError):
     """A matching call exceeded the expectation's quantifier upper bound."""
 
-    def __init__(self, method_name: str, calls: int, max_calls: int) -> None:
+    def __init__(self, method_name: str, calls: int, max_calls: int | None) -> None:
         self.method_name = method_name
         self.calls = calls
         self.max_calls = max_calls
@@ -121,7 +122,7 @@ class ExceededCallError(UnexpectedCallError):
         return (
             f"Unexpected call to {self.method_name!r}: "
             f"called {self.calls} time(s), "
-            f"max allowed is {self.max_calls}."
+            f"max allowed is {self.max_calls or 0}."
         )
 
 
@@ -130,7 +131,7 @@ class UnsatisfiedExpectationError(DeclarativeMockError):
 
     def __init__(
         self,
-        expectations: Sequence[Expectation],
+        expectations: Sequence[Expectation[Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.expectations = tuple(expectations)

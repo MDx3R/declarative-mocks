@@ -31,14 +31,17 @@ mock.verify()
 
 ### `mock.expect(name, /, *args, **kwargs)`
 
-Registers an expectation for attribute `name`. Absence of `args`/`kwargs` after `name` means **no arguments** to the call, not a wildcard.
+Registers an expectation for attribute `name`. `name` is a string or the unbound method or property from the spec class. Absence of `args`/`kwargs` after `name` means **no arguments** to the call, not a wildcard.
 
-Raises `AttributeError` if `name` is not on the spec. Returns an `Expectation` for chaining outcomes and quantifiers.
+A string does not select argument or outcome types: `.returns` accepts `object` and `.runs` accepts `Callable[..., object]`. A method or property lets a type checker check `*args`/`**kwargs` and the chained `.returns` / `.runs` against that attribute. Async methods unwrap the coroutine result in that check. Runtime behavior is the same for both forms: only the attribute's presence on the spec is validated.
+
+Raises `AttributeError` if `name` is not on the spec. Raises `ConfigurationError` if a callable or property has no usable name. Returns an `Expectation` for chaining outcomes and quantifiers.
 
 **Examples:**
 
 ```python
 mock.expect("process_order", 123).returns("processed")
+mock.expect(MyService.process_order, 123).returns("processed")
 mock.expect("process_order", order_id=123).returns("processed")
 ```
 
@@ -146,9 +149,9 @@ mock.expect("process_order", ANY_ARGS, ANY_KWARGS).returns("processed").at_least
 
 ### `mock.property(name, value, /)`
 
-Registers a stub attribute `name` that returns `value` directly on attribute access. No call is needed (no `()`).
+Registers a stub attribute `name` that returns `value` directly on attribute access. No call is needed (no `()`). `name` is a string or the property object from the spec class. A property object checks `value` against the property type; a string does not.
 
-Raises `AttributeError` if `name` is not on the spec. Raises `ConfigurationError` if `name` is already registered via `expect()` (and `expect()` raises `ConfigurationError` if the name is already registered as a property stub).
+Raises `AttributeError` if `name` is not on the spec. Raises `ConfigurationError` if `name` is already registered via `expect()` (and `expect()` raises `ConfigurationError` if the name is already registered as a property stub), or if a property object has no getter name.
 
 Property stubs have no quantifiers and are not tracked by `verify()`.
 
@@ -159,6 +162,7 @@ from dmock import DeclarativeMock
 
 mock = DeclarativeMock(MyService)
 mock.property("value", 123)
+mock.property(MyService.value, 123)
 val = mock.value  # no call needed
 assert val == 123
 ```

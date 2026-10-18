@@ -50,7 +50,7 @@ from dmock._matchers import (
     RegexSearch,
     StartsWith,
 )
-from dmock._mock import DeclarativeMock
+from dmock._mock import DeclarativeMock, dmock
 
 
 try:
@@ -103,5 +103,6 @@ __all__ = [
     "StartsWith",
     "UnexpectedCallError",
     "UnsatisfiedExpectationError",
+    "dmock",
     "in_order",
 ]

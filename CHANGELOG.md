@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-10-18
+
+- `expect` and `property` accept an unbound spec attribute (such as `Directory.lookup`, `Directory.value`) or a string name. The attribute form lets a type checker check the arguments and `.returns` / `.runs`. A string leaves the expectation lenient.
+- `DeclarativeMock` is generic over the spec. Abstract classes and protocols are valid specs.
+- `dmock(spec)` constructs a `DeclarativeMock`.
+- Fix: a call stops at the first matching expectation that is not exhausted. A later expectation for the same name, including a matcher that would raise on the actual arguments, is tried only after the earlier one is exhausted.
+
 ## [0.2.0] - 2026-10-18
 
 - Value, container, ordering, and text matchers, including `Equals`, `Contains`, `Range`, `LessThan`, `GreaterThan`, `Approx`, `StartsWith`, `Regex`, `TRUTHY`, `And`, and `Or`.
