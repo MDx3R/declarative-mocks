@@ -50,7 +50,10 @@ Here's an example of how _dmock_ improves your tests:
 from dmock import AnythingOfType, Contains, DeclarativeMock, StartsWith
 
 service = DeclarativeMock(Directory)
-service.expect("lookup", "ada").returns(User(id=1, name="Ada", email="ada@example.com"))
+# Using `Directory.lookup` helps a type checker to checks the call arguments and the values passed to `.returns` and `.runs`
+service.expect(Directory.lookup, "ada").returns(User(id=1, name="Ada", email="ada@example.com"))
+# or you could use the string form to produce a lenient expectation: any arguments, any outcome
+# service.expect("lookup", "ada").returns(User(id=1, name="Ada", email="ada@example.com"))
 
 assert service.lookup("ada") == User(
     id=AnythingOfType(int),
@@ -117,16 +120,16 @@ calc.expect("price", 400).never()
 calc.verify()
 ```
 
-Async methods use the same DSL. `runs()` accepts a sync or an async functions:
+Async methods use the same DSL. `runs()` accepts a sync or an async function:
 
 ```python
 from dmock import Anything, DeclarativeMock
 
 mock = DeclarativeMock(MyService)
-mock.expect("aprocess_order", Anything()).returns("ok")
+mock.expect(MyService.aprocess_order, Anything()).returns("ok")
 assert await mock.aprocess_order(1) == "ok"
 
-mock.expect("aprocess_order", Anything()).runs(lambda order_id: f"sync-{order_id}")
+mock.expect(MyService.aprocess_order, Anything()).runs(lambda order_id: f"sync-{order_id}")
 assert await mock.aprocess_order(7) == "sync-7"
 
 
@@ -134,7 +137,7 @@ async def async_fn(order_id: int) -> str:
     return f"async-{order_id}"
 
 
-mock.expect("aprocess_order", Anything()).runs(async_fn)
+mock.expect(MyService.aprocess_order, Anything()).runs(async_fn)
 assert await mock.aprocess_order(9) == "async-9"
 ```
 
@@ -144,14 +147,14 @@ Look up the dmock source code and tests yourself, it's full of examples!
 
 ## Limitations & non-goals
 
-- **No signature binding.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature.
+- **No signature binding at runtime.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature at runtime.
 - **No automatic** `verify()`. You call `verify()` yourself (a pytest hook is on the roadmap).
 - **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Just construct a `DeclarativeMock` and pass it in.
 - **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
 
 ## Roadmap
 
-After 0.2.0, in no particular order:
+After 0.3.0, in no particular order:
 
 - **pytest auto-**`verify()` - a plugin or fixture that runs `verify()` at the end of each test (gomock-style `Finish` on teardown), so you do not have to remember the call.
 - **Per-outcome counts (maybe)** - repeat a `.returns()` / `.raises()` / `.runs()` without chaining it n times (today `.returns(1).returns(1).returns(1).returns(2)`).
