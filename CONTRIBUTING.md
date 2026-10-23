@@ -39,9 +39,9 @@ Agents follow the same commands in [AGENTS.md](AGENTS.md).
 
 ---
 
-Add or update tests next to the change. `tests/test_mock.py` is the dispatch/integration suite; matcher and expectation units live in `tests/test_matchers.py` and `tests/test_expectation.py`.
+Add or update tests next to the change. `tests/mock/test_mock.py` is the dispatch/integration suite; matcher and expectation units live in `tests/test_matchers.py` and `tests/test_expectation.py`.
 
-**AAA** (`# Arrange`, `# Act`, `# Assert`) is for multi-step tests, mainly in `test_mock.py`:
+**AAA** (`# Arrange`, `# Act`, `# Assert`) is for multi-step tests, mainly in `tests/mock/test_mock.py`:
 
 - Every heading has a body. Do not leave an empty section.
 - Split a fused assert: call under `# Act`, comparison under `# Assert`.

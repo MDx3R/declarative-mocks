@@ -14,6 +14,7 @@ from dmock._exceptions import (
 )
 from dmock._expectation import Expectation
 from dmock._protocols import T
+from dmock._registry import MockRegistry
 from dmock._types import (
     DefaultOutcome,
     RaiseOutcome,
@@ -109,6 +110,7 @@ class DeclarativeMock(Generic[T], _Base):
         self.__hooked: set[str] = set()
         self.__properties: dict[str, object] = {}
         self.__calls: list[RecordedCall] = []
+        MockRegistry.add(self)
 
     # -- Public DSL --
 
@@ -311,6 +313,8 @@ class DeclarativeMock(Generic[T], _Base):
             ... except UnsatisfiedExpectationError as exc:
             ...     "expected exactly 1 call(s), got 0" in str(exc)
             True
+            >>> mock.fetch("a")
+            'A'
         """
         unsatisfied = [e for e in self.__expectations if not e.is_satisfied()]
         if not unsatisfied:

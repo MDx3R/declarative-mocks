@@ -28,6 +28,9 @@ Homepage = "https://github.com/MDx3R/declarative-mocks"
 Repository = "https://github.com/MDx3R/declarative-mocks"
 Issues = "https://github.com/MDx3R/declarative-mocks/issues"
 
+[project.entry-points.pytest11]
+dmock = "dmock._pytest_plugin"
+
 [tool.poetry]
 packages = [{ include = "dmock", from = "src" }]
 
