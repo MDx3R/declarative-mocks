@@ -148,16 +148,15 @@ Look up the dmock source code and tests yourself, it's full of examples!
 ## Limitations & non-goals
 
 - **No signature binding at runtime.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature at runtime.
-- **No automatic** `verify()`. You call `verify()` yourself (a pytest hook is on the roadmap).
+- **No automatic** `verify()` **outside pytest.** The pytest plugin checks every mock when the test finishes. Other runners still need an explicit `verify()`.
 - **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Just construct a `DeclarativeMock` and pass it in.
 - **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
 
 ## Roadmap
 
-After 0.3.0, in no particular order:
+Nothing is planned for 0.5.0, feel free to suggest!
 
-- **pytest auto-**`verify()` - a plugin or fixture that runs `verify()` at the end of each test (gomock-style `Finish` on teardown), so you do not have to remember the call.
-- **Per-outcome counts (maybe)** - repeat a `.returns()` / `.raises()` / `.runs()` without chaining it n times (today `.returns(1).returns(1).returns(1).returns(2)`).
+- **Other test runners (low priority)** - unittest and similar runners do not verify mocks on teardown the way the pytest plugin does.
 
 Other ideas belong in GitHub Issues.
 
@@ -169,7 +168,8 @@ ruff check .
 ruff format --check .
 mypy src tests
 pytest
-pytest --cov --cov-report=term-missing
+coverage run -m pytest
+coverage report
 ```
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, commits, and tests. Agents follow **[AGENTS.md](AGENTS.md)**.

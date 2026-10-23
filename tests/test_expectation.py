@@ -305,6 +305,46 @@ class TestOutcomeSequencing:
         assert exp.consume() == ReturnOutcome("a")
         assert exp.consume() == ReturnOutcome("b")
 
+    def test_repeat_appends_the_same_returns(self) -> None:
+        exp = make("f").returns("ok", repeat=3)
+        assert exp.consume() == ReturnOutcome("ok")
+        assert exp.consume() == ReturnOutcome("ok")
+        assert exp.consume() == ReturnOutcome("ok")
+        assert exp.is_satisfied() is True
+
+    def test_default_repeat_appends_one_outcome(self) -> None:
+        exp = make("f").returns("ok")
+        assert exp.consume() == ReturnOutcome("ok")
+        with pytest.raises(ExceededCallError):
+            exp.consume()
+
+    def test_repeat_then_another_return(self) -> None:
+        exp = make("f").returns(1, repeat=2).returns(2)
+        assert exp.consume() == ReturnOutcome(1)
+        assert exp.consume() == ReturnOutcome(1)
+        assert exp.consume() == ReturnOutcome(2)
+
+    def test_repeat_appends_the_same_raises(self) -> None:
+        exp = make("f").raises(ValueError, repeat=2)
+        assert exp.consume() == RaiseOutcome(ValueError)
+        assert exp.consume() == RaiseOutcome(ValueError)
+
+    def test_repeat_appends_the_same_runs(self) -> None:
+        fn = lambda: None  # noqa: E731
+        exp = make("f").runs(fn, repeat=2)
+        assert exp.consume() == RunOutcome(fn)
+        assert exp.consume() == RunOutcome(fn)
+
+    @pytest.mark.parametrize("repeat", [0, -1])
+    def test_repeat_below_one_raises(self, repeat: int) -> None:
+        fn = lambda: None  # noqa: E731
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").returns("ok", repeat=repeat)
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").raises(ValueError, repeat=repeat)
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").runs(fn, repeat=repeat)
+
     def test_last_outcome_repeats_after_list_end(self) -> None:
         exp = make("f").returns("a").returns("b").at_least(1)
         exp.consume()

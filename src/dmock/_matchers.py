@@ -317,7 +317,7 @@ class _NeverMatcher(Matcher):
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
-        >>> mock.expect("fetch", Never).returns("ok")
+        >>> mock.expect("fetch", Never).returns("ok").maybe()
         Expectation(fetch(Never))
         >>> Never.matches("a")
         False
