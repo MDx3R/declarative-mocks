@@ -72,4 +72,6 @@ jobs:
         run: poetry install --no-interaction --no-ansi
 
       - name: Run Pytest
-        run: poetry run pytest --cov --cov-report=term-missing
+        run: |
+          poetry run coverage run -m pytest
+          poetry run coverage report

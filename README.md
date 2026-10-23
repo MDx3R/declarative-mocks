@@ -168,7 +168,8 @@ ruff check .
 ruff format --check .
 mypy src tests
 pytest
-pytest --cov --cov-report=term-missing
+coverage run -m pytest
+coverage report
 ```
 
 See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, commits, and tests. Agents follow **[AGENTS.md](AGENTS.md)**.

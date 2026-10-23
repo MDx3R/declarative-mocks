@@ -44,7 +44,8 @@ pytest
 With coverage (matches [tool.coverage] in `pyproject.toml`):
 
 ```bash
-pytest --cov --cov-report=term-missing
+coverage run -m pytest
+coverage report
 ```
 
 ## Pre-commit

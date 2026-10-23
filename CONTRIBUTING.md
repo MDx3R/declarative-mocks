@@ -22,7 +22,8 @@ ruff check .
 ruff format --check .
 mypy src tests
 pytest
-pytest --cov --cov-report=term-missing
+coverage run -m pytest
+coverage report
 ```
 
 Optional: `pre-commit run --all-files`, `pyright`.
