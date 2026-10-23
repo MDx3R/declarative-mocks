@@ -78,14 +78,19 @@ class Expectation(Generic[P, R]):
 
     # -- Fluent outcome builders --
 
-    def returns(self, value: R) -> Self:
+    def returns(self, value: R, *, repeat: int = 1) -> Self:
         """Declare the return value for the next matching call.
 
         Args:
             value: Object returned as-is (tuples are not unpacked).
+            repeat: How many successive calls receive this outcome. Must be
+                at least 1.
 
         Returns:
             This expectation, for chaining.
+
+        Raises:
+            ConfigurationError: If `repeat` is less than 1.
 
         Examples:
             >>> from dmock import DeclarativeMock
@@ -97,17 +102,26 @@ class Expectation(Generic[P, R]):
             >>> mock.fetch("a")
             'A'
         """
-        self._outcomes.append(ReturnOutcome(value))
+        self._append_outcome(ReturnOutcome(value), repeat)
         return self
 
-    def raises(self, exc: BaseException | type[BaseException]) -> Self:
+    def raises(
+        self,
+        exc: BaseException | type[BaseException],
+        *,
+        repeat: int = 1,
+    ) -> Self:
         """Declare that the next matching call raises `exc`.
 
         Args:
             exc: Exception instance, or a type instantiated with no arguments.
+            repeat: How many successive calls raise `exc`. Must be at least 1.
 
         Returns:
             This expectation, for chaining.
+
+        Raises:
+            ConfigurationError: If `repeat` is less than 1.
 
         Examples:
             >>> from dmock import DeclarativeMock
@@ -121,16 +135,16 @@ class Expectation(Generic[P, R]):
                 ...
             KeyError
         """
-        self._outcomes.append(RaiseOutcome(exc))
+        self._append_outcome(RaiseOutcome(exc), repeat)
         return self
 
     @overload
-    def runs(self, func: Callable[P, R]) -> Self: ...
+    def runs(self, func: Callable[P, R], *, repeat: int = 1) -> Self: ...
 
     @overload
-    def runs(self, func: Callable[P, Awaitable[R]]) -> Self: ...
+    def runs(self, func: Callable[P, Awaitable[R]], *, repeat: int = 1) -> Self: ...
 
-    def runs(self, func: Callable[P, R | Awaitable[R]]) -> Self:
+    def runs(self, func: Callable[P, R | Awaitable[R]], *, repeat: int = 1) -> Self:
         """Call `func` with the actual arguments for the next matching call.
 
         The return value of `func` becomes the result of that call. Chaining
@@ -139,9 +153,13 @@ class Expectation(Generic[P, R]):
 
         Args:
             func: Called as ``func(*args, **kwargs)`` of the matching invocation.
+            repeat: How many successive calls invoke `func`. Must be at least 1.
 
         Returns:
             This expectation, for chaining.
+
+        Raises:
+            ConfigurationError: If `repeat` is less than 1.
 
         Examples:
             >>> from dmock import DeclarativeMock
@@ -161,8 +179,20 @@ class Expectation(Generic[P, R]):
             >>> mock.fetch("a")
             'from-returns'
         """
-        self._outcomes.append(RunOutcome(func))
+        self._append_outcome(RunOutcome(func), repeat)
         return self
+
+    def _append_outcome(self, outcome: Outcome, repeat: int) -> None:
+        """Append `outcome` once per `repeat`.
+
+        Raises:
+            ConfigurationError: If `repeat` is less than 1.
+        """
+        if repeat < 1:
+            raise ConfigurationError(f"repeat requires repeat >= 1, got {repeat}.")
+
+        for _ in range(repeat):
+            self._outcomes.append(outcome)
 
     # -- Fluent quantifiers --
 
