@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-10-23
+
+- pytest calls `verify()` when a test finishes. An unmet expectation fails that test. An exception the test already raised is kept. Mocks created while fixtures finalize are checked after teardown and do not leak into the next test.
+- `.returns()`, `.raises()`, and `.runs()` take a keyword-only `repeat` (default 1). `repeat=n` queues that outcome n times. `repeat` less than 1 raises `ConfigurationError`.
+
 ## [0.3.0] - 2026-10-18
 
 - `expect` and `property` accept an unbound spec attribute (such as `Directory.lookup`, `Directory.value`) or a string name. The attribute form lets a type checker check the arguments and `.returns` / `.runs`. A string leaves the expectation lenient.

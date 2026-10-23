@@ -18,7 +18,7 @@ The library provides a **declarative** layer over `unittest.mock` (typically `Mo
 
 - `expect(name, …)` registers an expectation for an attribute on the mock. `name` is a string or the unbound method or property from the spec class (`Service.fetch`). A string does not select argument or outcome types. A method or property lets a type checker check the expected arguments and the chained outcomes against that attribute. At runtime both forms only check that the attribute exists on the spec.
 - Arguments after the name describe **expected** call arguments (positional and keyword), possibly using matchers.
-- Multiple `returns(…)`, `raises(…)`, or `runs(…)` on one expectation define a **sequence** of outcomes for successive matching calls. Order of chained outcomes matters. `.runs(fn).returns(value)` is two calls, not a side effect plus a return on the same call.
+- Multiple `returns(…)`, `raises(…)`, or `runs(…)` on one expectation define a **sequence** of outcomes for successive matching calls. Order of chained outcomes matters. `.runs(fn).returns(value)` is two calls, not a side effect plus a return on the same call. Each of those methods takes a keyword-only `repeat` (default 1). `repeat=n` appends that same outcome `n` times, which is the same sequence as chaining the call `n` times. `repeat` less than 1 raises `ConfigurationError`.
 
 ## Quantifiers and call counts
 
@@ -35,9 +35,9 @@ When the quantifier allows more calls than there are outcomes, the **last** outc
 
 ## Outcomes
 
-- **returns(value)** - return a single Python value for a matching call. Tuples are returned as tuples; no unpacking is performed.
-- **raises(exc)** - raise an exception instance or type. If a type is passed, it is instantiated with no arguments before raising.
-- **runs(func)** - call `func(*args, **kwargs)` with the actual call arguments; the return value of `func` becomes the call result.
+- **returns(value, \*, repeat=1)** - return a single Python value for a matching call. Tuples are returned as tuples; no unpacking is performed. `repeat` appends this outcome that many times.
+- **raises(exc, \*, repeat=1)** - raise an exception instance or type. If a type is passed, it is instantiated with no arguments before raising. `repeat` appends this outcome that many times.
+- **runs(func, \*, repeat=1)** - call `func(*args, **kwargs)` with the actual call arguments; the return value of `func` becomes the call result. `repeat` appends this outcome that many times.
 - **No explicit outcome** - delegates to the internal `unittest.mock.Mock` child (returns a `Mock` object).
 
 ## Property stubs
@@ -50,6 +50,7 @@ When the quantifier allows more calls than there are outcomes, the **last** outc
 ## Verification
 
 - **verify()** performs a final pass: all registered expectations must be satisfied (call counts as specified). Raises `UnsatisfiedExpectationError` listing every unsatisfied expectation with expected vs actual call counts. Diagnostic text does not change matching or dispatch rules.
+- Under pytest, the installed plugin calls `verify()` on every mock created during the test when the test call finishes. An unsatisfied expectation fails that test. An exception the test already raised stays the failure. Mocks created while fixtures are finalizing are verified afterward; that failure is reported on teardown and does not affect the next test. Other runners do not call `verify()` for you.
 
 ## Exhaustion
 
@@ -82,7 +83,7 @@ Cross-mock dependencies (prerequisites on a different `DeclarativeMock` instance
 ## Non-goals
 
 - No signature binding at runtime: `expect` checks that the attribute exists on the spec, not that the argument list matches the real signature. When `name` is a method or property object, type checkers check arguments and outcomes statically.
-- No automatic `verify()` at teardown.
+- No automatic `verify()` outside pytest. Other runners still need an explicit `verify()`.
 - No spies and no patching of live objects, modules, or `sys.modules`.
 - Not thread-safe.
 - Exact class names and internal algorithms.

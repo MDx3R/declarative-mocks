@@ -45,17 +45,17 @@ mock.expect(MyService.process_order, 123).returns("processed")
 mock.expect("process_order", order_id=123).returns("processed")
 ```
 
-### `… .returns(value)`
+### `… .returns(value, *, repeat=1)`
 
-Declares a return value for the next matching call. Returns a single Python object; tuples are returned as tuples without unpacking.
+Declares a return value for the next matching call. Returns a single Python object; tuples are returned as tuples without unpacking. `repeat` appends that outcome once per count (default 1). `repeat` less than 1 raises `ConfigurationError`.
 
-### `… .raises(exc)`
+### `… .raises(exc, *, repeat=1)`
 
-Declares that the next matching call raises `exc`. If `exc` is an exception type (not an instance), it is instantiated with no arguments before raising.
+Declares that the next matching call raises `exc`. If `exc` is an exception type (not an instance), it is instantiated with no arguments before raising. `repeat` works as on `returns`.
 
-### `… .runs(func)`
+### `… .runs(func, *, repeat=1)`
 
-Calls `func(*args, **kwargs)` with the actual call arguments when this expectation matches. The return value of `func` becomes the result of the call.
+Calls `func(*args, **kwargs)` with the actual call arguments when this expectation matches. The return value of `func` becomes the result of the call. `repeat` works as on `returns`.
 
 Chaining `runs` then `returns` schedules **two** outcomes for **two** successive calls, not a side effect plus a return on the same call.
 
@@ -70,7 +70,7 @@ If you omit a quantifier, the count is exactly the number of chained outcomes (m
 **Example:**
 
 ```python
-mock.expect("do_something").returns("ok").returns("ok").returns("fail")
+mock.expect("do_something").returns("ok", repeat=2).returns("fail")
 ```
 
 ## Quantifiers
@@ -215,14 +215,16 @@ Calling expectations out of order raises `UnexpectedCallError`.
 
 Final verification: all registered expectations must be satisfied according to their quantifiers. Raises `UnsatisfiedExpectationError` with a message listing every unsatisfied expectation as `Expectation(...) - expected <constraint>, got <n>`. Expectations marked `.maybe()` that were never called do not contribute to failures. When any calls were dispatched, the message also includes a call history.
 
+Under pytest this check runs when the test finishes. An unmet expectation fails the test. An exception the test already raised is left in place. Mocks created while fixtures finalize are checked after teardown and do not leak into the next test. Calling `verify()` yourself still works. Other runners do not do this.
+
 ## Errors
 
-| Exception                     | When raised                                                                                                                                  |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DeclarativeMockError`        | Base type for the three public errors below                                                                                                  |
-| `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted |
-| `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                      |
-| `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names on the spec, `expect`/`property` clash, cycles in `not_before`                    |
+| Exception                     | When raised                                                                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DeclarativeMockError`        | Base type for the three public errors below                                                                                                     |
+| `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted    |
+| `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                         |
+| `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names on the spec, `expect`/`property` clash, cycles in `not_before`, `repeat` less than 1 |
 
 `UnexpectedCallError` for a dispatched call includes the actual `args`/`kwargs`, then a **Candidates** list of registered expectations for that name with a reason for each: `args mismatch`, `exhausted (n/max calls)`, or `blocked by <method> (expected …, got …)`. Out-of-order calls use the `blocked by` form. Messages also include a **Call history** of prior (and the failing) dispatches. Matching and ordering rules are unchanged; only the text is richer. The public type to catch is `UnexpectedCallError`; the raised instance is a more specific subclass so the traceback names the case (unregistered, no match, blocked, exceeded). Those subclasses are not part of the public DSL.
 
