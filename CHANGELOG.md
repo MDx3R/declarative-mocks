@@ -5,7 +5,13 @@ All notable changes to this project are documented in this file.
 ## [Unreleased]
 
 - `CollectionOf` matches the same sequence, set, or mapping kind. Order matters for sequences only. `SequenceOf`, `SetOf`, and `MappingOf` match one kind.
-- `InstanceOf` matches an instance of a type. `exact=True` requires that exact type. `AnythingOfType` is now an alias.
+- `AnythingOfType` matches an instance of a type. `exact=True` requires that exact type. `InstanceOf` is an alias.
+- `HasLen` matches a sized value by its length. The length may be a matcher.
+- `AnyOrder` matches the same items in any order. Each expected item is paired with a distinct element.
+- `PartialMapping` matches a mapping that contains the given pairs. Extra keys are ignored.
+- `IsNow` matches a datetime within `tolerance` of the current time.
+- `IsUUID` matches a UUID or a UUID string, optionally of one version. `IS_UUID` accepts any version.
+- `IsDataclass` matches a dataclass instance. `instance=False` matches a dataclass class or instance. `IS_DATACLASS` matches an instance.
 
 ## [0.4.0] - 2026-10-23
 

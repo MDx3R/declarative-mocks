@@ -114,6 +114,7 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `TRUTHY` / `FALSY`                          | Truthy or falsy value                                                |
 | `NAIVE_DATETIME` / `AWARE_DATETIME`         | Naive or timezone-aware `datetime`                                   |
 | `Empty()` / `EMPTY`                         | Sized value with length zero                                         |
+| `HasLen(expected)`                          | Length equals `expected`. `expected` may be a matcher                |
 | `In(container)`                             | Value is a member of `container`                                     |
 | `Contains(item)`                            | Container holds `item`                                               |
 | `Includes(*items)`                          | Container holds every item                                           |
@@ -121,11 +122,16 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `SequenceOf(expected)`                      | Same sequence elements, in order                                     |
 | `SetOf(expected)`                           | Same set elements                                                    |
 | `MappingOf(expected)`                       | Same mapping pairs                                                   |
+| `AnyOrder(items)`                           | Same items in any order, each paired with a distinct element         |
+| `PartialMapping(expected)`                  | Mapping contains the given pairs.                                    |
 | `Attr(name)`                                | Object has attribute `name`                                          |
 | `Range(left, right)`                        | Value is strictly inside the interval                                |
 | `LessThan` / `GreaterThan`                  | Strict ordering                                                      |
 | `LessEquals` / `GreaterEquals`              | Inclusive ordering                                                   |
 | `Approx(expected)`                          | Number close to `expected` (`math.isclose`)                          |
+| `IsNow()`                                   | Datetime within `tolerance` of the current time                      |
+| `IsUUID()` / `IS_UUID`                      | UUID or UUID string. `version` limits the accepted version           |
+| `IsDataclass()` / `IS_DATACLASS`            | Dataclass instance. `instance=False` matches a class or an instance  |
 | `StartsWith` / `EndsWith`                   | String prefix or suffix                                              |
 | `Regex` / `RegexMatch`                      | `re.match` from the start of a string                                |
 | `RegexSearch`                               | `re.search` anywhere in a string                                     |
