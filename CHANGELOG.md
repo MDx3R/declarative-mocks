@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-31
+
 - `CollectionOf` matches the same sequence, set, or mapping kind. Order matters for sequences only. `SequenceOf`, `SetOf`, and `MappingOf` match one kind.
 - `AnythingOfType` matches an instance of a type. `exact=True` requires that exact type. `InstanceOf` is an alias.
 - `HasLen` matches a sized value by its length. The length may be a matcher.
