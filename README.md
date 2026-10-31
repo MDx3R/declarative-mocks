@@ -40,17 +40,19 @@ service = Mock(spec=Directory)
 service.lookup.return_value = User(id=1, name="Ada", email="ada@example.com")
 
 user = service.lookup("ada")
-assert isinstance(user.id, int)
-assert user.name.startswith("A")
-assert "@" in user.email
+assert user.id == 1
+assert user.name == "Ada"
+assert user.email == "ada@example.com"
 assert abs((datetime.now() - user.created_at).total_seconds()) < 5
-service.lookup.assert_called_once_with("ada")
+name = service.lookup.call_args.args[0]
+assert isinstance(name, str)
+assert name.startswith("a")
 ```
 
 Here's an example of how **dmock** improves your tests:
 
 ```python
-from dmock import AnythingOfType, Contains, DeclarativeMock, IsNow, StartsWith
+from dmock import DeclarativeMock, IsNow, StartsWith
 
 service = DeclarativeMock(Directory)
 service.expect(Directory.lookup, StartsWith("a")).returns(
@@ -118,7 +120,7 @@ calc = DeclarativeMock(Calculator)
 calc.expect("price", 100).returns(99).once()
 assert calc.price(100) == 99
 
-calc.expect("price", 200).returns(99).times(3)  # last outcome repeats for the extra calls
+calc.expect("price", 200).returns(99, repeat=2).times(3)  # last outcome repeats for the extra calls
 assert [calc.price(200) for _ in range(3)] == [99, 99, 99]
 
 calc.expect("price", 300).returns(99).between(1, 3)
