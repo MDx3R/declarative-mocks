@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-31
+
+- Fix the README quantifier example. `.returns()` takes `repeat`. `.times(n)` is the quantifier.
+
 ## [0.4.1] - 2026-10-31
 
 - `CollectionOf` matches the same sequence, set, or mapping kind. Order matters for sequences only. `SequenceOf`, `SetOf`, and `MappingOf` match one kind.
