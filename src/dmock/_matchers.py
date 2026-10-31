@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import dataclasses
 import math
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Container, Sized
-from datetime import datetime
-from typing import TYPE_CHECKING, Protocol, SupportsFloat, TypeAlias
+from collections.abc import Collection, Container, Mapping, Sequence, Set, Sized
+from datetime import datetime, timedelta
+from typing import (
+    TYPE_CHECKING,
+    Protocol,
+    SupportsFloat,
+    TypeAlias,
+    cast,
+    overload,
+)
+from uuid import UUID
 
 
 if TYPE_CHECKING:
@@ -342,28 +351,64 @@ class AnythingOfType(Matcher):
     """Matches a value that is an instance of the given type.
 
     Args:
-        expected_type: Type accepted by ``isinstance``.
+        expected: Type accepted by ``isinstance``.
+        exact: When True, the value's type must be `expected` itself.
 
     Examples:
         >>> from dmock import AnythingOfType, DeclarativeMock
+        >>> True == AnythingOfType(int)
+        True
+        >>> True == AnythingOfType(int, exact=True)
+        False
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
         >>> mock.expect("fetch", AnythingOfType(str)).returns("ok")
-        Expectation(fetch(AnythingOfType(str)))
+        Expectation(fetch(AnythingOfType(str, exact=False)))
         >>> mock.fetch("a")
         'ok'
     """
 
-    def __init__(self, expected_type: type, /) -> None:
-        self._expected_type = expected_type
+    def __init__(self, expected: type, /, *, exact: bool = False) -> None:
+        self._expected = expected
+        self._exact = exact
 
     def matches(self, value: object, /) -> bool:
         """Return whether `value` is an instance of the expected type."""
-        return isinstance(value, self._expected_type)
+        return (
+            type(value) is self._expected
+            if self._exact
+            else isinstance(value, self._expected)
+        )
 
     def __repr__(self) -> str:
-        return f"AnythingOfType({self._expected_type.__name__})"
+        return f"AnythingOfType({self._expected.__name__}, exact={self._exact})"
+
+
+InstanceOf = AnythingOfType
+"""Alias of :class:`AnythingOfType`.
+
+``InstanceOf(expected)`` constructs that matcher. ``exact`` defaults to
+False, so a subclass matches. ``exact=True`` requires
+``type(value) is expected``.
+
+Examples:
+    >>> from dmock import AnythingOfType, InstanceOf
+    >>> InstanceOf is AnythingOfType
+    True
+    >>> True == InstanceOf(int)
+    True
+    >>> True == InstanceOf(int, exact=True)
+    False
+    >>> class Base:
+    ...     pass
+    >>> class Child(Base):
+    ...     pass
+    >>> Child() == InstanceOf(Base)
+    True
+    >>> Child() == InstanceOf(Base, exact=True)
+    False
+"""
 
 
 class Equals(Matcher):
@@ -624,6 +669,44 @@ class Empty(Matcher):
 EMPTY = Empty()
 
 
+class HasLen(Matcher):
+    """Matches a sized value whose length equals `expected`.
+
+    `expected` may be an integer or a :class:`Matcher` applied to ``len``.
+    A value that is not :class:`collections.abc.Sized` does not match.
+
+    Args:
+        expected: Length, or a matcher for the length.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, GreaterThan, HasLen
+        >>> [1, 2, 3] == HasLen(3)
+        True
+        >>> [1] == HasLen(GreaterThan(2))
+        False
+        >>> class Service:
+        ...     def fetch(self, items: list[int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", HasLen(1)).returns("ok")
+        Expectation(fetch(HasLen(1)))
+        >>> mock.fetch([1])
+        'ok'
+    """
+
+    def __init__(self, expected: int | Matcher, /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` has the expected length."""
+        if not isinstance(value, Sized):
+            return False
+
+        return len(value) == self._expected
+
+    def __repr__(self) -> str:
+        return f"HasLen({self._expected!r})"
+
+
 class In(Matcher):
     """Matches a value that is a member of `expected`.
 
@@ -720,6 +803,322 @@ class Includes(Matcher):
 
     def __repr__(self) -> str:
         return f"Includes({', '.join(map(repr, self._items))})"
+
+
+class CollectionOf(Matcher):
+    """Matches a sequence, set, or mapping of the same kind as `expected`.
+
+    Order matters for sequences. Sets and mappings ignore order. A different
+    kind does not match. Values of the same kind match when their elements
+    are equal, including when the concrete types differ.
+
+    ``str``, ``bytes``, ``bytearray``, ``memoryview``, and
+    :class:`collections.UserString` are sequences and are valid `expected`
+    values. They match any sequence of the same elements in the same order.
+    A ``str`` or :class:`collections.UserString` yields characters. ``bytes``,
+    ``bytearray``, and a ``memoryview`` of a bytes buffer yield integers, so
+    they match each other and a list of those integers.
+
+    Args:
+        expected: Sequence, set, or mapping to compare against.
+
+    Examples:
+        >>> from dmock import DeclarativeMock
+        >>> from dmock import CollectionOf
+        >>> (1, 2, 3) == CollectionOf([1, 2, 3])
+        True
+        >>> (1, 2, 3) == CollectionOf({1, 2, 3})
+        False
+        >>> "ab" == CollectionOf(["a", "b"])
+        True
+        >>> ["a", "b"] == CollectionOf("ab")
+        True
+        >>> b"ab" == CollectionOf(bytearray(b"ab"))
+        True
+        >>> [97, 98] == CollectionOf(b"ab")
+        True
+        >>> bytearray(b"ab") == CollectionOf(memoryview(b"ab"))
+        True
+        >>> from collections import UserString
+        >>> UserString("ab") == CollectionOf("ab")
+        True
+        >>> "ab" == CollectionOf(UserString("ab"))
+        True
+        >>> "ab" == CollectionOf(b"ab")
+        False
+        >>> class Service:
+        ...     def fetch(self, items: tuple[int, ...]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", CollectionOf([1, 2, 3])).returns("ok")
+        Expectation(fetch(CollectionOf([1, 2, 3])))
+        >>> mock.fetch((1, 2, 3))
+        'ok'
+    """
+
+    def __init__(self, expected: Collection[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:  # noqa: PLR0911
+        """Return whether `value` has the same kind and the same contents."""
+        if not isinstance(value, Collection):
+            return False
+
+        value = cast("Collection[object]", value)
+        if len(value) != len(self._expected):
+            return False
+
+        if type(value) is type(self._expected):
+            return value == self._expected
+
+        if isinstance(value, Sequence) and isinstance(self._expected, Sequence):
+            return all(v == e for v, e in zip(value, self._expected, strict=True))
+
+        if isinstance(value, Set) and isinstance(self._expected, Set):
+            return all(v in self._expected for v in value)
+
+        if isinstance(value, Mapping) and isinstance(self._expected, Mapping):
+            value, self._expected = (
+                cast("Mapping[object, object]", value),
+                cast("Mapping[object, object]", self._expected),
+            )
+            return all(
+                k in self._expected and value[k] == self._expected[k] for k in value
+            )
+
+        return False
+
+    def __repr__(self) -> str:
+        return f"CollectionOf({self._expected!r})"
+
+
+class AnyOrder(Matcher):
+    """Matches a collection that has the same items in any order.
+
+    Each expected item is paired with a distinct element. A matcher item is
+    compared with ``==``, so it is applied to that element. The collection
+    must have the same length. A ``str``, ``bytes``, ``bytearray``,
+    ``memoryview``, or :class:`collections.UserString` is a sequence of its
+    elements.
+
+    Args:
+        items: Expected items. A string is a sequence of characters.
+
+    Examples:
+        >>> from dmock import AnyOrder, DeclarativeMock
+        >>> [1, 2, 3] == AnyOrder([3, 1, 2])
+        True
+        >>> [1, 2] == AnyOrder([1, 2, 3])
+        False
+        >>> class Service:
+        ...     def fetch(self, items: list[int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", AnyOrder([1, 2])).returns("ok")
+        Expectation(fetch(AnyOrder([1, 2])))
+        >>> mock.fetch([2, 1])
+        'ok'
+    """
+
+    def __init__(self, items: Collection[object], /) -> None:
+        self._items = items
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` has the same items in any order."""
+        if not isinstance(value, Collection):
+            return False
+
+        actual = list(cast("Collection[object]", value))
+        expected = list(self._items)
+        if len(actual) != len(expected):
+            return False
+
+        candidates = [
+            [index for index, candidate in enumerate(actual) if wanted == candidate]
+            for wanted in expected
+        ]
+        if any(not options for options in candidates):
+            return False
+
+        used = [False] * len(actual)
+
+        def assign(start: int) -> bool:
+            if start == len(expected):
+                return True
+
+            for index in candidates[start]:
+                if used[index]:
+                    continue
+
+                used[index] = True
+                if assign(start + 1):
+                    return True
+
+                used[index] = False
+
+            return False
+
+        return assign(0)
+
+    def __repr__(self) -> str:
+        return f"AnyOrder({list(self._items)!r})"
+
+
+class SequenceOf(Matcher):
+    """Matches a sequence with the same elements in the same order.
+
+    A set or mapping does not match. ``str``, ``bytes``, ``bytearray``,
+    ``memoryview``, and :class:`collections.UserString` are sequences of
+    their elements, as with :class:`CollectionOf`.
+
+    Args:
+        expected: Sequence to compare against.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, SequenceOf
+        >>> (1, 2) == SequenceOf([1, 2])
+        True
+        >>> "ab" == SequenceOf(["a", "b"])
+        True
+        >>> {1, 2} == SequenceOf([1, 2])
+        False
+        >>> class Service:
+        ...     def fetch(self, items: tuple[int, ...]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", SequenceOf([1, 2])).returns("ok")
+        Expectation(fetch(SequenceOf([1, 2])))
+        >>> mock.fetch((1, 2))
+        'ok'
+    """
+
+    def __init__(self, expected: Sequence[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a sequence of the same elements."""
+        if not isinstance(value, Sequence):
+            return False
+
+        return CollectionOf(self._expected).matches(cast("Sequence[object]", value))
+
+    def __repr__(self) -> str:
+        return f"SequenceOf({self._expected!r})"
+
+
+class SetOf(Matcher):
+    """Matches a set with the same elements.
+
+    Order is ignored. A sequence or mapping does not match.
+
+    Args:
+        expected: Set to compare against.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, SetOf
+        >>> frozenset({1, 2}) == SetOf({2, 1})
+        True
+        >>> [1, 2] == SetOf({1, 2})
+        False
+        >>> class Service:
+        ...     def fetch(self, items: set[int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", SetOf({1, 2})).returns("ok")
+        Expectation(fetch(SetOf({1, 2})))
+        >>> mock.fetch({2, 1})
+        'ok'
+    """
+
+    def __init__(self, expected: Set[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a set of the same elements."""
+        if not isinstance(value, Set):
+            return False
+
+        return CollectionOf(self._expected).matches(cast("Set[object]", value))
+
+    def __repr__(self) -> str:
+        return f"SetOf({self._expected!r})"
+
+
+class MappingOf(Matcher):
+    """Matches a mapping with the same keys and values.
+
+    Key order is ignored. A sequence does not match. Extra keys do not match.
+
+    Args:
+        expected: Mapping to compare against.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, MappingOf
+        >>> {"b": 1, "a": 2} == MappingOf({"a": 2, "b": 1})
+        True
+        >>> {"a": 1, "b": 2} == MappingOf({"a": 1})
+        False
+        >>> class Service:
+        ...     def save(self, item: dict[str, int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", MappingOf({"a": 1})).returns("ok")
+        Expectation(save(MappingOf({'a': 1})))
+        >>> mock.save({"a": 1})
+        'ok'
+    """
+
+    def __init__(self, expected: Mapping[object, object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a mapping of the same pairs."""
+        if not isinstance(value, Mapping):
+            return False
+
+        return CollectionOf(self._expected).matches(
+            cast("Mapping[object, object]", value)
+        )
+
+    def __repr__(self) -> str:
+        return f"MappingOf({self._expected!r})"
+
+
+class PartialMapping(Matcher):
+    """Matches a mapping that contains every given pair.
+
+    Keys that are not listed are ignored. A value that is a :class:`Matcher`
+    is applied to the mapped value. Other values use ``==``.
+
+    Args:
+        expected: Pairs the mapping must contain.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, GreaterThan, PartialMapping
+        >>> {"a": 1, "b": 2} == PartialMapping({"a": GreaterThan(0)})
+        True
+        >>> {"a": 1} == PartialMapping({"b": 1})
+        False
+        >>> class Service:
+        ...     def save(self, item: dict[str, int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", PartialMapping({"status": "ok"})).returns("ok")
+        Expectation(save(PartialMapping({'status': 'ok'})))
+        >>> mock.save({"status": "ok", "id": 1})
+        'ok'
+    """
+
+    def __init__(self, expected: Mapping[object, object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` contains every expected pair."""
+        if not isinstance(value, Mapping):
+            return False
+
+        value = cast("Mapping[object, object]", value)
+        return all(
+            key in value and expected == value[key]
+            for key, expected in self._expected.items()
+        )
+
+    def __repr__(self) -> str:
+        return f"PartialMapping({self._expected!r})"
 
 
 class Attr(Matcher):
@@ -1029,6 +1428,54 @@ class Approx(Matcher):
         )
 
 
+class IsNow(Matcher):
+    """Matches a datetime close to the current time.
+
+    `tolerance` is a number of seconds or a :class:`datetime.timedelta`.
+    The window is that wide on either side of now. A naive value is compared
+    with :meth:`datetime.datetime.now`. An aware value is compared with
+    ``datetime.now(value.tzinfo)``. A negative tolerance matches no datetime.
+
+    Args:
+        tolerance: Half-width of the accepted window. Defaults to 5 seconds.
+
+    Examples:
+        >>> from datetime import datetime, timezone
+        >>> from dmock import DeclarativeMock, IsNow
+        >>> datetime.now(timezone.utc) == IsNow()
+        True
+        >>> class Service:
+        ...     def save(self, at: datetime) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", IsNow()).returns("ok")
+        Expectation(save(IsNow(tolerance=5.0)))
+        >>> mock.save(datetime.now(timezone.utc))
+        'ok'
+    """
+
+    @overload
+    def __init__(self, *, tolerance: timedelta = timedelta(seconds=5)) -> None: ...
+    @overload
+    def __init__(self, *, tolerance: SupportsFloat = 5.0) -> None: ...
+
+    def __init__(self, *, tolerance: SupportsFloat | timedelta = 5.0) -> None:
+        if isinstance(tolerance, timedelta):
+            self._tolerance = tolerance.total_seconds()
+        else:
+            self._tolerance = float(tolerance)
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a datetime inside the window."""
+        if not isinstance(value, datetime):
+            return False
+
+        now = datetime.now(value.tzinfo)
+        return abs((value - now).total_seconds()) <= self._tolerance
+
+    def __repr__(self) -> str:
+        return f"IsNow(tolerance={self._tolerance!r})"
+
+
 class StartsWith(Matcher):
     """Matches a string that starts with `prefix`.
 
@@ -1211,6 +1658,136 @@ class RegexFullmatch(Matcher):
 
     def __repr__(self) -> str:
         return f"RegexFullmatch(expected={self._expected!r}, flags={self._flags!r})"
+
+
+class IsUUID(Matcher):
+    """Matches a :class:`uuid.UUID` or a string that parses as one.
+
+    `version` is checked for a UUID object and for a parsed string. Omit it
+    to accept any version.
+
+    Args:
+        version: Required UUID version.
+
+    Examples:
+        >>> from uuid import uuid4
+        >>> from dmock import DeclarativeMock, IsUUID
+        >>> uuid4() == IsUUID(version=4)
+        True
+        >>> "not-a-uuid" == IsUUID()
+        False
+        >>> class Service:
+        ...     def save(self, item_id: str) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", IsUUID(version=4)).returns("ok")
+        Expectation(save(IsUUID(version=4)))
+        >>> mock.save(str(uuid4()))
+        'ok'
+    """
+
+    def __init__(self, *, version: int | None = None) -> None:
+        self._version = version
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a UUID of the requested version."""
+        if isinstance(value, UUID):
+            return self._version is None or value.version == self._version
+
+        if not isinstance(value, str):
+            return False
+
+        try:
+            uid = UUID(value)
+        except ValueError:
+            return False
+
+        return self._version is None or uid.version == self._version
+
+    def __repr__(self) -> str:
+        return f"IsUUID(version={self._version!r})"
+
+
+IS_UUID = IsUUID()
+"""Matches any :class:`uuid.UUID` or a string that parses as one.
+
+``version`` is omitted, so any UUID version matches.
+
+Examples:
+    >>> from uuid import uuid4
+    >>> from dmock import DeclarativeMock, IS_UUID
+    >>> uuid4() == IS_UUID
+    True
+    >>> "not-a-uuid" == IS_UUID
+    False
+    >>> class Service:
+    ...     def save(self, item_id: str) -> str: ...
+    >>> mock = DeclarativeMock(Service)
+    >>> mock.expect("save", IS_UUID).returns("ok")
+    Expectation(save(IsUUID(version=None)))
+    >>> mock.save(str(uuid4()))
+    'ok'
+"""
+
+
+class IsDataclass(Matcher):
+    """Matches a dataclass instance, or a dataclass type.
+
+    Args:
+        instance: When True, match an instance and reject a class. When False,
+            match a dataclass class or instance.
+
+    Examples:
+        >>> from dataclasses import dataclass
+        >>> from dmock import DeclarativeMock, IsDataclass
+        >>> @dataclass
+        ... class Item:
+        ...     name: str
+        >>> Item("n") == IsDataclass()
+        True
+        >>> class Service:
+        ...     def save(self, item: Item) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", IsDataclass()).returns("ok")
+        Expectation(save(IsDataclass(instance=True)))
+        >>> mock.save(Item("n"))
+        'ok'
+    """
+
+    def __init__(self, *, instance: bool = True) -> None:
+        self._instance = instance
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a dataclass instance or class."""
+        if self._instance and isinstance(value, type):
+            return False
+
+        return dataclasses.is_dataclass(value)
+
+    def __repr__(self) -> str:
+        return f"IsDataclass(instance={self._instance})"
+
+
+IS_DATACLASS = IsDataclass()
+"""Matches a dataclass instance only.
+
+Examples:
+    >>> from dataclasses import dataclass
+    >>> from dmock import DeclarativeMock, IS_DATACLASS
+    >>> @dataclass
+    ... class Item:
+    ...     name: str
+    >>> Item("n") == IS_DATACLASS
+    True
+    >>> Item == IS_DATACLASS
+    False
+    >>> class Service:
+    ...     def save(self, item: Item) -> str: ...
+    >>> mock = DeclarativeMock(Service)
+    >>> mock.expect("save", IS_DATACLASS).returns("ok")
+    Expectation(save(IsDataclass(instance=True)))
+    >>> mock.save(Item("n"))
+    'ok'
+"""
 
 
 class Args(Matcher):

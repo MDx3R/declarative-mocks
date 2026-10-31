@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+## [0.4.1] - 2026-10-31
+
+- `CollectionOf` matches the same sequence, set, or mapping kind. Order matters for sequences only. `SequenceOf`, `SetOf`, and `MappingOf` match one kind.
+- `AnythingOfType` matches an instance of a type. `exact=True` requires that exact type. `InstanceOf` is an alias.
+- `HasLen` matches a sized value by its length. The length may be a matcher.
+- `AnyOrder` matches the same items in any order. Each expected item is paired with a distinct element.
+- `PartialMapping` matches a mapping that contains the given pairs. Extra keys are ignored.
+- `IsNow` matches a datetime within `tolerance` of the current time.
+- `IsUUID` matches a UUID or a UUID string, optionally of one version. `IS_UUID` accepts any version.
+- `IsDataclass` matches a dataclass instance. `instance=False` matches a dataclass class or instance. `IS_DATACLASS` matches an instance.
+
 ## [0.4.0] - 2026-10-23
 
 - pytest calls `verify()` when a test finishes. An unmet expectation fails that test. An exception the test already raised is kept. Mocks created while fixtures finalize are checked after teardown and do not leak into the next test.

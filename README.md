@@ -22,7 +22,8 @@ _dmock_ requires Python 3.11+.
 Normally you would set a return value, then check the object field by field and assert the call separately:
 
 ```python
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from unittest.mock import Mock
 
 @dataclass
@@ -30,6 +31,7 @@ class User:
     id: int
     name: str
     email: str
+    created_at: datetime = field(default_factory=datetime.now)
 
 class Directory:
     def lookup(self, name: str) -> User: ...
@@ -41,29 +43,32 @@ user = service.lookup("ada")
 assert isinstance(user.id, int)
 assert user.name.startswith("A")
 assert "@" in user.email
+assert abs((datetime.now() - user.created_at).total_seconds()) < 5
 service.lookup.assert_called_once_with("ada")
 ```
 
-Here's an example of how _dmock_ improves your tests:
+Here's an example of how **dmock** improves your tests:
 
 ```python
-from dmock import AnythingOfType, Contains, DeclarativeMock, StartsWith
+from dmock import AnythingOfType, Contains, DeclarativeMock, IsNow, StartsWith
 
 service = DeclarativeMock(Directory)
-# Using `Directory.lookup` helps a type checker to checks the call arguments and the values passed to `.returns` and `.runs`
-service.expect(Directory.lookup, "ada").returns(User(id=1, name="Ada", email="ada@example.com"))
-# or you could use the string form to produce a lenient expectation: any arguments, any outcome
-# service.expect("lookup", "ada").returns(User(id=1, name="Ada", email="ada@example.com"))
+service.expect(Directory.lookup, StartsWith("a")).returns(
+    User(id=1, name="Ada", email="ada@example.com")
+)
 
 assert service.lookup("ada") == User(
-    id=AnythingOfType(int),
-    name=StartsWith("A"),
-    email=Contains("@"),
+    id=1,
+    name="Ada",
+    email="ada@example.com",
+    created_at=IsNow(),
 )
+
+# verify is automatic with pytest
 service.verify()
 ```
 
-That's not all! _dmock_ can do so much more than that, for example:
+That's not all! **dmock** can do so much more than that, for example:
 
 Successive outcomes apply to the next matching call, in order:
 
@@ -71,7 +76,10 @@ Successive outcomes apply to the next matching call, in order:
 from dmock import DeclarativeMock
 
 api = DeclarativeMock(ApiClient)
-api.expect("next_page").returns({"items": [1], "cursor": "a"})
+# Using `ApiClient.next_page` helps a type checker to check
+# the `expect` arguments and the values passed to `.returns` and `.runs`
+api.expect(ApiClient.next_page).returns({"items": [1], "cursor": "a"})
+# or you could use the string form to produce a lenient expectation: any arguments, any outcome
 api.expect("next_page").returns({"items": [2], "cursor": None})
 # first call → first dict; second call → second dict
 
@@ -89,7 +97,7 @@ from dmock import Anything, DeclarativeMock
 m = DeclarativeMock(Worker)
 m.expect("run")  # called with no arguments
 m.expect("run", Anything()).returns(0)  # any single positional arg
-m.expect("run", job_id=123).returns("queued")  # this keyword only
+m.expect("run", job_id=123).returns("queued")  # this is keyword only
 ```
 
 `ANY_ARGS` and `ANY_KWARGS` match any positional and keyword arguments, including none:
@@ -132,13 +140,72 @@ assert await mock.aprocess_order(1) == "ok"
 mock.expect(MyService.aprocess_order, Anything()).runs(lambda order_id: f"sync-{order_id}")
 assert await mock.aprocess_order(7) == "sync-7"
 
-
 async def async_fn(order_id: int) -> str:
     return f"async-{order_id}"
 
-
 mock.expect(MyService.aprocess_order, Anything()).runs(async_fn)
 assert await mock.aprocess_order(9) == "async-9"
+```
+
+The matcher set is rich enough that even the most complicated call stays as **one declarative expectation**. Prefixes, partial mappings, lengths, order, and formats compose in place:
+
+```python
+from dmock import (
+    AnyOrder,
+    DeclarativeMock,
+    Equals,
+    GreaterThan,
+    HasLen,
+    IsUUID,
+    PartialMapping,
+    StartsWith,
+)
+
+class EventBus:
+    def publish(self, *, topic: str, headers: dict, payload: dict) -> bool: ...
+
+bus = DeclarativeMock(EventBus)
+bus.expect(
+    "publish",
+    topic=StartsWith("orders.events."),
+    headers=PartialMapping(
+        {
+            "x-correlation-id": IsUUID(),
+            "x-origin-service": Equals("checkout-service"),
+        }
+    ),
+    payload=PartialMapping(
+        {
+            "order_id": GreaterThan(0),
+            "items": HasLen(GreaterThan(0))
+            & AnyOrder(
+                [
+                    PartialMapping({"sku": "SKU-AAA", "qty": 1}),
+                    PartialMapping({"sku": "SKU-BBB", "qty": 2}),
+                ]
+            ),
+        }
+    ),
+).returns(True)
+
+assert bus.publish(
+    topic="orders.events.completed",
+    headers={
+        "x-correlation-id": "12345678-1234-4234-8234-123456789abc",
+        "x-origin-service": "checkout-service",
+        "x-extra": "ignored",
+    },
+    payload={
+        "order_id": 884,
+        "items": [
+            {"sku": "SKU-BBB", "qty": 2, "note": "second"},
+            {"sku": "SKU-AAA", "qty": 1},
+        ],
+        "currency": "USD",
+    },
+)
+
+bus.verify()
 ```
 
 **dmock** is built on `unittest.mock`, has zero runtime dependencies, and doesn't patch anything. Unregistered calls fail immediately. Nothing on live modules or instances is rewritten.

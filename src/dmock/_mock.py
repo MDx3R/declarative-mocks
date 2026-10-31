@@ -50,10 +50,6 @@ class _ExpectationLookup:
     rejected: tuple[Expectation[..., object], ...]
 
 
-def _is_dunder(name: str) -> bool:
-    return name.startswith("__") and name.endswith("__")
-
-
 _RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"})
 
 
@@ -326,7 +322,7 @@ class DeclarativeMock(Generic[T], _Base):
 
     def __getattr__(self, name: str) -> Any:
         mock_attr = getattr(self.__mock, name)  # AttributeError if not on spec
-        if _is_dunder(name):
+        if name.startswith("__") and name.endswith("__"):
             return mock_attr
 
         if name in self.__properties:

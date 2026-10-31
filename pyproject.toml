@@ -1,6 +1,6 @@
 [project]
 name = "declarative-mocks"
-version = "0.4.0"
+version = "0.4.1"
 description = "Declare mock behavior as ordered expectations. Simple, typed, gomock-inspired DSL over unittest.mock"
 authors = [{ name = "Dimitry Churilov", email = "d.mdx3r@gmail.com" }]
 license = "MIT"
@@ -9,7 +9,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 keywords = ["mock", "mocking", "testing", "unittest", "pytest"]
 classifiers = [
+    "Framework :: Pytest",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
