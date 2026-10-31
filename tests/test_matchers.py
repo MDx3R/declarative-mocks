@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import re
 from collections import UserDict, UserString
-from collections.abc import Collection, Mapping, Sequence, Set
 from dataclasses import dataclass, make_dataclass
 from datetime import UTC, datetime, timedelta
 from types import MappingProxyType
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 from uuid import UUID
 
 import pytest
@@ -71,11 +70,19 @@ from dmock._matchers import (
 )
 
 
+if TYPE_CHECKING:
+    from collections.abc import Collection, Mapping, Sequence, Set
+
+
 class TestAnything:
     @pytest.mark.parametrize(
         "value",
-        [42, "hello", None, [1, 2, 3]],
-        ids=["int", "str", "none", "list"],
+        [
+            pytest.param(42, id="int"),
+            pytest.param("hello", id="str"),
+            pytest.param(None, id="none"),
+            pytest.param([1, 2, 3], id="list"),
+        ],
     )
     def test_matches_any_value(self, value: object) -> None:
         assert Anything.matches(value) is True
@@ -118,20 +125,26 @@ class TestAnythingOfType:
     @pytest.mark.parametrize(
         ("matcher", "value", "matched"),
         [
-            (AnythingOfType(int), True, True),
-            (AnythingOfType(int, exact=True), True, False),
-            (AnythingOfType(bool, exact=True), True, True),
-            (AnythingOfType(int, exact=True), 1, True),
-            (InstanceOf(int), True, True),
-            (InstanceOf(int, exact=True), True, False),
-        ],
-        ids=[
-            "int-accepts-bool",
-            "exact-int-rejects-bool",
-            "exact-bool-accepts-bool",
-            "exact-int-accepts-int",
-            "alias-accepts-bool",
-            "alias-exact-rejects-bool",
+            pytest.param(AnythingOfType(int), True, True, id="int-accepts-bool"),
+            pytest.param(
+                AnythingOfType(int, exact=True),
+                True,
+                False,
+                id="exact-int-rejects-bool",
+            ),
+            pytest.param(
+                AnythingOfType(bool, exact=True),
+                True,
+                True,
+                id="exact-bool-accepts-bool",
+            ),
+            pytest.param(
+                AnythingOfType(int, exact=True), 1, True, id="exact-int-accepts-int"
+            ),
+            pytest.param(InstanceOf(int), True, True, id="alias-accepts-bool"),
+            pytest.param(
+                InstanceOf(int, exact=True), True, False, id="alias-exact-rejects-bool"
+            ),
         ],
     )
     def test_exact_controls_subclass_matching(
@@ -171,8 +184,10 @@ class TestMatchedBy:
 
     @pytest.mark.parametrize(
         ("value", "expected"),
-        [(4, True), (3, False)],
-        ids=["even", "odd"],
+        [
+            pytest.param(4, True, id="even"),
+            pytest.param(3, False, id="odd"),
+        ],
     )
     def test_with_named_function(self, value: int, expected: bool) -> None:
         def is_even(x: object) -> bool:
@@ -215,7 +230,13 @@ class TestSentinels:
 
 class TestNever:
     @pytest.mark.parametrize(
-        "value", [0, "", None, Never], ids=["zero", "empty-str", "none", "never"]
+        "value",
+        [
+            pytest.param(0, id="zero"),
+            pytest.param("", id="empty-str"),
+            pytest.param(None, id="none"),
+            pytest.param(Never, id="never"),
+        ],
     )
     def test_matches_nothing(self, value: object) -> None:
         assert Never.matches(value) is False
@@ -306,23 +327,49 @@ class TestIs:
 
 
 class TestTruthyAndFalsy:
-    @pytest.mark.parametrize("value", ["a", 1, [0]], ids=["str", "int", "list"])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            pytest.param("a", id="str"),
+            pytest.param(1, id="int"),
+            pytest.param([0], id="list"),
+        ],
+    )
     def test_truthy_matches(self, value: object) -> None:
         assert TRUTHY.matches(value) is True
 
     @pytest.mark.parametrize(
-        "value", ["", 0, None, []], ids=["empty-str", "zero", "none", "empty-list"]
+        "value",
+        [
+            pytest.param("", id="empty-str"),
+            pytest.param(0, id="zero"),
+            pytest.param(None, id="none"),
+            pytest.param([], id="empty-list"),
+        ],
     )
     def test_truthy_rejects_falsy(self, value: object) -> None:
         assert TRUTHY.matches(value) is False
 
     @pytest.mark.parametrize(
-        "value", ["", 0, None, []], ids=["empty-str", "zero", "none", "empty-list"]
+        "value",
+        [
+            pytest.param("", id="empty-str"),
+            pytest.param(0, id="zero"),
+            pytest.param(None, id="none"),
+            pytest.param([], id="empty-list"),
+        ],
     )
     def test_falsy_matches(self, value: object) -> None:
         assert FALSY.matches(value) is True
 
-    @pytest.mark.parametrize("value", ["a", 1, [0]], ids=["str", "int", "list"])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            pytest.param("a", id="str"),
+            pytest.param(1, id="int"),
+            pytest.param([0], id="list"),
+        ],
+    )
     def test_falsy_rejects_truthy(self, value: object) -> None:
         assert FALSY.matches(value) is False
 
@@ -352,13 +399,25 @@ class TestDatetimeMatchers:
 
 class TestEmpty:
     @pytest.mark.parametrize(
-        "value", ["", [], {}, ()], ids=["str", "list", "dict", "tuple"]
+        "value",
+        [
+            pytest.param("", id="str"),
+            pytest.param([], id="list"),
+            pytest.param({}, id="dict"),
+            pytest.param((), id="tuple"),
+        ],
     )
     def test_matches_empty_sized(self, value: object) -> None:
         assert Empty().matches(value) is True
 
     @pytest.mark.parametrize(
-        "value", ["a", [1], None, 0], ids=["str", "list", "none", "int"]
+        "value",
+        [
+            pytest.param("a", id="str"),
+            pytest.param([1], id="list"),
+            pytest.param(None, id="none"),
+            pytest.param(0, id="int"),
+        ],
     )
     def test_rejects_non_empty_or_unsized(self, value: object) -> None:
         assert Empty().matches(value) is False
@@ -374,31 +433,17 @@ class TestEmpty:
 class TestHasLen:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, int | Matcher, bool]](
-            [
-                ([1, 2, 3], 3, True),
-                ([1], 3, False),
-                ([1], GreaterThan(2), False),
-                ([1, 2, 3], GreaterThan(2), True),
-                ("ab", 2, True),
-                (b"ab", 2, True),
-                ([], 0, True),
-                ({"a": 1}, 1, True),
-                (None, 0, False),
-                (1, 0, False),
-            ]
-        ),
-        ids=[
-            "three-items",
-            "too-short",
-            "length-below-matcher",
-            "length-above-matcher",
-            "str",
-            "bytes",
-            "empty-list",
-            "dict",
-            "none",
-            "int",
+        [
+            pytest.param([1, 2, 3], 3, True, id="three-items"),
+            pytest.param([1], 3, False, id="too-short"),
+            pytest.param([1], GreaterThan(2), False, id="length-below-matcher"),
+            pytest.param([1, 2, 3], GreaterThan(2), True, id="length-above-matcher"),
+            pytest.param("ab", 2, True, id="str"),
+            pytest.param(b"ab", 2, True, id="bytes"),
+            pytest.param([], 0, True, id="empty-list"),
+            pytest.param({"a": 1}, 1, True, id="dict"),
+            pytest.param(None, 0, False, id="none"),
+            pytest.param(1, 0, False, id="int"),
         ],
     )
     def test_matches(
@@ -469,115 +514,68 @@ class TestIncludes:
 class TestCollectionOf:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ((1, 2, 3), [1, 2, 3], True),
-                ([1, 2, 3], (1, 2, 3), True),
-                ([1, 2], [1, 2], True),
-                ([1, 2], [2, 1], False),
-                ((1, 2), [2, 1], False),
-                ([1, 2], [1, 2, 3], False),
-                (range(3), [0, 1, 2], True),
-                ((1, 2, 3), {1, 2, 3}, False),
-                ([1, 2], {1, 2}, False),
-                ({1, 2}, {2, 1}, True),
-                ({1, 2}, frozenset({2, 1}), True),
-                (frozenset({1}), {1}, True),
-                ({1, 2}, frozenset({1, 3}), False),
-                ({"b": 1, "a": 2}, {"a": 2, "b": 1}, True),
-                ({"a": 1}, {"a": 2}, False),
-                ({"a": 1, "b": 2}, {"a": 1}, False),
-                (UserDict({"a": 1}), {"a": 1}, True),
-                (MappingProxyType({"b": 1, "a": 2}), {"a": 2, "b": 1}, True),
-                ({"a": 1}, [("a", 1)], False),
-                ({1: "a", 2: "b"}.keys(), {1, 2}, True),
-                ({1: "a"}.items(), {(1, "a")}, True),
-                ({1: "a"}.values(), ["a"], False),
-                ("ab", ["a", "b"], True),
-                (["a", "b"], "ab", True),
-                ("ab", ("a", "b"), True),
-                ("ab", "ab", True),
-                ("ab", ["b", "a"], False),
-                ("ab", ["a"], False),
-                ("", [], True),
-                ([], "", True),
-                ("", {}, False),
-                ("", set(), False),
-                ("ab", {"a", "b"}, False),
-                (b"ab", bytearray(b"ab"), True),
-                (bytearray(b"ab"), b"ab", True),
-                (b"ab", [97, 98], True),
-                ([97, 98], b"ab", True),
-                (bytearray(b"ab"), memoryview(b"ab"), True),
-                (memoryview(b"ab"), b"ab", True),
-                (memoryview(b"ab"), [97, 98], True),
-                (b"ab", memoryview(b"ab"), True),
-                (b"", [], True),
-                (b"ab", ["a", "b"], False),
-                ("ab", b"ab", False),
-                (b"ab", "ab", False),
-                (UserString("ab"), "ab", True),
-                ("ab", UserString("ab"), True),
-                (UserString("ab"), ["a", "b"], True),
-                (["a", "b"], UserString("ab"), True),
-                (UserString("ab"), UserString("ab"), True),
-                (1, [1], False),
-                (None, [], False),
-            ]
-        ),
-        ids=[
-            "tuple-list",
-            "list-tuple",
-            "same-list",
-            "reversed-list",
-            "reversed-tuple",
-            "shorter-list",
-            "range",
-            "tuple-vs-set",
-            "list-vs-set",
-            "same-set",
-            "set-frozenset",
-            "frozenset-set",
-            "different-set",
-            "dict-order",
-            "dict-value",
-            "dict-extra-key",
-            "user-dict",
-            "mapping-proxy",
-            "dict-vs-pairs",
-            "dict-keys",
-            "dict-items",
-            "dict-values",
-            "str-chars",
-            "chars-str",
-            "str-tuple",
-            "same-str",
-            "reversed-chars",
-            "short-str",
-            "empty-str-list",
-            "empty-list-str",
-            "empty-str-dict",
-            "empty-str-set",
-            "str-vs-set",
-            "bytes-bytearray",
-            "bytearray-bytes",
-            "bytes-ints",
-            "ints-bytes",
-            "bytearray-memoryview",
-            "memoryview-bytes",
-            "memoryview-ints",
-            "bytes-memoryview",
-            "empty-bytes",
-            "bytes-vs-chars",
-            "str-vs-bytes",
-            "bytes-vs-str",
-            "userstring-str",
-            "str-userstring",
-            "userstring-chars",
-            "chars-userstring",
-            "same-userstring",
-            "int",
-            "none",
+        [
+            pytest.param((1, 2, 3), [1, 2, 3], True, id="tuple-list"),
+            pytest.param([1, 2, 3], (1, 2, 3), True, id="list-tuple"),
+            pytest.param([1, 2], [1, 2], True, id="same-list"),
+            pytest.param([1, 2], [2, 1], False, id="reversed-list"),
+            pytest.param((1, 2), [2, 1], False, id="reversed-tuple"),
+            pytest.param([1, 2], [1, 2, 3], False, id="shorter-list"),
+            pytest.param(range(3), [0, 1, 2], True, id="range"),
+            pytest.param((1, 2, 3), {1, 2, 3}, False, id="tuple-vs-set"),
+            pytest.param([1, 2], {1, 2}, False, id="list-vs-set"),
+            pytest.param({1, 2}, {2, 1}, True, id="same-set"),
+            pytest.param({1, 2}, frozenset({2, 1}), True, id="set-frozenset"),
+            pytest.param(frozenset({1}), {1}, True, id="frozenset-set"),
+            pytest.param({1, 2}, frozenset({1, 3}), False, id="different-set"),
+            pytest.param({"b": 1, "a": 2}, {"a": 2, "b": 1}, True, id="dict-order"),
+            pytest.param({"a": 1}, {"a": 2}, False, id="dict-value"),
+            pytest.param({"a": 1, "b": 2}, {"a": 1}, False, id="dict-extra-key"),
+            pytest.param(UserDict({"a": 1}), {"a": 1}, True, id="user-dict"),
+            pytest.param(
+                MappingProxyType({"b": 1, "a": 2}),
+                {"a": 2, "b": 1},
+                True,
+                id="mapping-proxy",
+            ),
+            pytest.param({"a": 1}, [("a", 1)], False, id="dict-vs-pairs"),
+            pytest.param({1: "a", 2: "b"}.keys(), {1, 2}, True, id="dict-keys"),
+            pytest.param({1: "a"}.items(), {(1, "a")}, True, id="dict-items"),
+            pytest.param({1: "a"}.values(), ["a"], False, id="dict-values"),
+            pytest.param("ab", ["a", "b"], True, id="str-chars"),
+            pytest.param(["a", "b"], "ab", True, id="chars-str"),
+            pytest.param("ab", ("a", "b"), True, id="str-tuple"),
+            pytest.param("ab", "ab", True, id="same-str"),
+            pytest.param("ab", ["b", "a"], False, id="reversed-chars"),
+            pytest.param("ab", ["a"], False, id="short-str"),
+            pytest.param("", [], True, id="empty-str-list"),
+            pytest.param([], "", True, id="empty-list-str"),
+            pytest.param("", {}, False, id="empty-str-dict"),
+            pytest.param("", set[object](), False, id="empty-str-set"),
+            pytest.param("ab", {"a", "b"}, False, id="str-vs-set"),
+            pytest.param(b"ab", bytearray(b"ab"), True, id="bytes-bytearray"),
+            pytest.param(bytearray(b"ab"), b"ab", True, id="bytearray-bytes"),
+            pytest.param(b"ab", [97, 98], True, id="bytes-ints"),
+            pytest.param([97, 98], b"ab", True, id="ints-bytes"),
+            pytest.param(
+                bytearray(b"ab"), memoryview(b"ab"), True, id="bytearray-memoryview"
+            ),
+            pytest.param(memoryview(b"ab"), b"ab", True, id="memoryview-bytes"),
+            pytest.param(memoryview(b"ab"), [97, 98], True, id="memoryview-ints"),
+            pytest.param(b"ab", memoryview(b"ab"), True, id="bytes-memoryview"),
+            pytest.param(b"", [], True, id="empty-bytes"),
+            pytest.param(b"ab", ["a", "b"], False, id="bytes-vs-chars"),
+            pytest.param("ab", b"ab", False, id="str-vs-bytes"),
+            pytest.param(b"ab", "ab", False, id="bytes-vs-str"),
+            pytest.param(UserString("ab"), "ab", True, id="userstring-str"),
+            pytest.param("ab", UserString("ab"), True, id="str-userstring"),
+            pytest.param(UserString("ab"), ["a", "b"], True, id="userstring-chars"),
+            pytest.param(["a", "b"], UserString("ab"), True, id="chars-userstring"),
+            pytest.param(
+                UserString("ab"), UserString("ab"), True, id="same-userstring"
+            ),
+            pytest.param(1, [1], False, id="int"),
+            pytest.param(None, [], False, id="none"),
         ],
     )
     def test_matches(
@@ -591,12 +589,11 @@ class TestCollectionOf:
     @pytest.mark.parametrize(
         ("expected", "text"),
         [
-            ([1, 2, 3], "CollectionOf([1, 2, 3])"),
-            ("ab", "CollectionOf('ab')"),
-            (b"ab", "CollectionOf(b'ab')"),
-            ({1, 2}, "CollectionOf({1, 2})"),
+            pytest.param([1, 2, 3], "CollectionOf([1, 2, 3])", id="list"),
+            pytest.param("ab", "CollectionOf('ab')", id="str"),
+            pytest.param(b"ab", "CollectionOf(b'ab')", id="bytes"),
+            pytest.param({1, 2}, "CollectionOf({1, 2})", id="set"),
         ],
-        ids=["list", "str", "bytes", "set"],
     )
     def test_repr(self, expected: Collection[object], text: str) -> None:
         assert repr(CollectionOf(expected)) == text
@@ -608,51 +605,27 @@ class TestCollectionOf:
 class TestSequenceOf:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Sequence[object], bool]](
-            [
-                ((1, 2, 3), [1, 2, 3], True),
-                ([1, 2, 3], (1, 2, 3), True),
-                ([1, 2], [2, 1], False),
-                ([1, 2], [1, 2, 3], False),
-                (range(3), [0, 1, 2], True),
-                ({1, 2, 3}, [1, 2, 3], False),
-                ({1, 2}, [1, 2], False),
-                ("ab", ["a", "b"], True),
-                (["a", "b"], "ab", True),
-                ("ab", ["b", "a"], False),
-                ("", [], True),
-                ({"a", "b"}, ["a", "b"], False),
-                (b"ab", [97, 98], True),
-                (bytearray(b"ab"), b"ab", True),
-                (memoryview(b"ab"), [97, 98], True),
-                ("ab", b"ab", False),
-                (UserString("ab"), "ab", True),
-                ("ab", UserString("ab"), True),
-                (1, [1], False),
-                (None, [], False),
-            ]
-        ),
-        ids=[
-            "tuple-list",
-            "list-tuple",
-            "reversed-list",
-            "shorter-list",
-            "range",
-            "set-of-three",
-            "set",
-            "str-chars",
-            "chars-str",
-            "reversed-chars",
-            "empty-str",
-            "set-of-chars",
-            "bytes-ints",
-            "bytearray-bytes",
-            "memoryview-ints",
-            "str-vs-bytes",
-            "userstring-str",
-            "str-userstring",
-            "int",
-            "none",
+        [
+            pytest.param((1, 2, 3), [1, 2, 3], True, id="tuple-list"),
+            pytest.param([1, 2, 3], (1, 2, 3), True, id="list-tuple"),
+            pytest.param([1, 2], [2, 1], False, id="reversed-list"),
+            pytest.param([1, 2], [1, 2, 3], False, id="shorter-list"),
+            pytest.param(range(3), [0, 1, 2], True, id="range"),
+            pytest.param({1, 2, 3}, [1, 2, 3], False, id="set-of-three"),
+            pytest.param({1, 2}, [1, 2], False, id="set"),
+            pytest.param("ab", ["a", "b"], True, id="str-chars"),
+            pytest.param(["a", "b"], "ab", True, id="chars-str"),
+            pytest.param("ab", ["b", "a"], False, id="reversed-chars"),
+            pytest.param("", [], True, id="empty-str"),
+            pytest.param({"a", "b"}, ["a", "b"], False, id="set-of-chars"),
+            pytest.param(b"ab", [97, 98], True, id="bytes-ints"),
+            pytest.param(bytearray(b"ab"), b"ab", True, id="bytearray-bytes"),
+            pytest.param(memoryview(b"ab"), [97, 98], True, id="memoryview-ints"),
+            pytest.param("ab", b"ab", False, id="str-vs-bytes"),
+            pytest.param(UserString("ab"), "ab", True, id="userstring-str"),
+            pytest.param("ab", UserString("ab"), True, id="str-userstring"),
+            pytest.param(1, [1], False, id="int"),
+            pytest.param(None, [], False, id="none"),
         ],
     )
     def test_matches(
@@ -670,29 +643,16 @@ class TestSequenceOf:
 class TestSetOf:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Set[object], bool]](
-            [
-                ({1, 2}, {2, 1}, True),
-                (frozenset({1, 2}), {2, 1}, True),
-                ({1}, frozenset({1}), True),
-                ({1, 2}, frozenset({1, 3}), False),
-                ([1, 2], {1, 2}, False),
-                ((1, 2), {1, 2}, False),
-                ({"a": 1}, {1}, False),
-                ({1: "a", 2: "b"}.keys(), {1, 2}, True),
-                (1, {1}, False),
-            ]
-        ),
-        ids=[
-            "same-set",
-            "frozenset-set",
-            "set-frozenset",
-            "different-set",
-            "list",
-            "tuple",
-            "dict",
-            "dict-keys",
-            "int",
+        [
+            pytest.param({1, 2}, {2, 1}, True, id="same-set"),
+            pytest.param(frozenset({1, 2}), {2, 1}, True, id="frozenset-set"),
+            pytest.param({1}, frozenset({1}), True, id="set-frozenset"),
+            pytest.param({1, 2}, frozenset({1, 3}), False, id="different-set"),
+            pytest.param([1, 2], {1, 2}, False, id="list"),
+            pytest.param((1, 2), {1, 2}, False, id="tuple"),
+            pytest.param({"a": 1}, {1}, False, id="dict"),
+            pytest.param({1: "a", 2: "b"}.keys(), {1, 2}, True, id="dict-keys"),
+            pytest.param(1, {1}, False, id="int"),
         ],
     )
     def test_matches(
@@ -710,29 +670,21 @@ class TestSetOf:
 class TestMappingOf:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Mapping[object, object], bool]](
-            [
-                ({"b": 1, "a": 2}, {"a": 2, "b": 1}, True),
-                ({"a": 1}, {"a": 2}, False),
-                ({"a": 1, "b": 2}, {"a": 1}, False),
-                ({"a": 1}, {"a": 1, "b": 2}, False),
-                (UserDict({"a": 1}), {"a": 1}, True),
-                (MappingProxyType({"b": 1, "a": 2}), {"a": 2, "b": 1}, True),
-                ([("a", 1)], {"a": 1}, False),
-                ((("a", 1),), {"a": 1}, False),
-                (1, {"a": 1}, False),
-            ]
-        ),
-        ids=[
-            "same-pairs",
-            "different-value",
-            "extra-key",
-            "missing-key",
-            "user-dict",
-            "mapping-proxy",
-            "list",
-            "tuple",
-            "int",
+        [
+            pytest.param({"b": 1, "a": 2}, {"a": 2, "b": 1}, True, id="same-pairs"),
+            pytest.param({"a": 1}, {"a": 2}, False, id="different-value"),
+            pytest.param({"a": 1, "b": 2}, {"a": 1}, False, id="extra-key"),
+            pytest.param({"a": 1}, {"a": 1, "b": 2}, False, id="missing-key"),
+            pytest.param(UserDict({"a": 1}), {"a": 1}, True, id="user-dict"),
+            pytest.param(
+                MappingProxyType({"b": 1, "a": 2}),
+                {"a": 2, "b": 1},
+                True,
+                id="mapping-proxy",
+            ),
+            pytest.param([("a", 1)], {"a": 1}, False, id="list"),
+            pytest.param((("a", 1),), {"a": 1}, False, id="tuple"),
+            pytest.param(1, {"a": 1}, False, id="int"),
         ],
     )
     def test_matches(
@@ -750,47 +702,25 @@ class TestMappingOf:
 class TestAnyOrder:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ([1, 2, 3], [3, 1, 2], True),
-                ([1, 2, 3], [1, 2, 3], True),
-                ((1, 2, 3), [3, 2, 1], True),
-                ([2, 0, 1], range(3), True),
-                ([1], [1], True),
-                ([], [], True),
-                ((), [], True),
-                ([1, 2], [1, 2, 3], False),
-                ([1, 2, 3], [1, 2], False),
-                ([1, 2, 3], [1, 2, 4], False),
-                ([1, 2], [1, 1], False),
-                ([1.0, 2.0], [2, 1], True),
-                ([[2], [1]], [[1], [2]], True),
-                ([{2}, {1}], [{1}, {2}], True),
-                ([1], [True], True),
-                ([1, 2], [True, 2], True),
-                ([1, 2], [1, True], False),
-                ([float("nan")], [float("nan")], False),
-            ]
-        ),
-        ids=[
-            "permuted",
-            "same-order",
-            "tuple",
-            "range",
-            "single",
-            "empty-lists",
-            "empty-tuple",
-            "shorter-value",
-            "shorter-expected",
-            "different-item",
-            "duplicate-expected",
-            "floats",
-            "nested-lists",
-            "nested-sets",
-            "bool-equals-int",
-            "bool-with-int",
-            "bool-takes-the-only-one",
-            "nan",
+        [
+            pytest.param([1, 2, 3], [3, 1, 2], True, id="permuted"),
+            pytest.param([1, 2, 3], [1, 2, 3], True, id="same-order"),
+            pytest.param((1, 2, 3), [3, 2, 1], True, id="tuple"),
+            pytest.param([2, 0, 1], range(3), True, id="range"),
+            pytest.param([1], [1], True, id="single"),
+            pytest.param([], [], True, id="empty-lists"),
+            pytest.param((), [], True, id="empty-tuple"),
+            pytest.param([1, 2], [1, 2, 3], False, id="shorter-value"),
+            pytest.param([1, 2, 3], [1, 2], False, id="shorter-expected"),
+            pytest.param([1, 2, 3], [1, 2, 4], False, id="different-item"),
+            pytest.param([1, 2], [1, 1], False, id="duplicate-expected"),
+            pytest.param([1.0, 2.0], [2, 1], True, id="floats"),
+            pytest.param([[2], [1]], [[1], [2]], True, id="nested-lists"),
+            pytest.param([{2}, {1}], [{1}, {2}], True, id="nested-sets"),
+            pytest.param([1], [True], True, id="bool-equals-int"),
+            pytest.param([1, 2], [True, 2], True, id="bool-with-int"),
+            pytest.param([1, 2], [1, True], False, id="bool-takes-the-only-one"),
+            pytest.param([float("nan")], [float("nan")], False, id="nan"),
         ],
     )
     def test_matches_same_items_in_any_order(
@@ -803,33 +733,18 @@ class TestAnyOrder:
 
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ([1, 1], [1, 1], True),
-                ([1, 1, 1], [1, 1, 1], True),
-                ([2, 1, 2], [1, 2, 2], True),
-                ([1, 2], [1, 1], False),
-                ([1, 1], [1, 2], False),
-                ([1, 1, 2], [1, 1, 1], False),
-                ("aa", ["a", "a"], True),
-                ("ab", ["a", "a"], False),
-                (b"aa", [97, 97], True),
-                (b"ab", [97, 97], False),
-                ({1, 2}, [1, 1], False),
-            ]
-        ),
-        ids=[
-            "two-ones",
-            "three-ones",
-            "two-twos",
-            "one-extra-one",
-            "missing-two",
-            "three-vs-two",
-            "repeated-char",
-            "different-chars",
-            "repeated-byte",
-            "different-bytes",
-            "set-collapses-duplicate",
+        [
+            pytest.param([1, 1], [1, 1], True, id="two-ones"),
+            pytest.param([1, 1, 1], [1, 1, 1], True, id="three-ones"),
+            pytest.param([2, 1, 2], [1, 2, 2], True, id="two-twos"),
+            pytest.param([1, 2], [1, 1], False, id="one-extra-one"),
+            pytest.param([1, 1], [1, 2], False, id="missing-two"),
+            pytest.param([1, 1, 2], [1, 1, 1], False, id="three-vs-two"),
+            pytest.param("aa", ["a", "a"], True, id="repeated-char"),
+            pytest.param("ab", ["a", "a"], False, id="different-chars"),
+            pytest.param(b"aa", [97, 97], True, id="repeated-byte"),
+            pytest.param(b"ab", [97, 97], False, id="different-bytes"),
+            pytest.param({1, 2}, [1, 1], False, id="set-collapses-duplicate"),
         ],
     )
     def test_pairs_each_item_with_a_distinct_element(
@@ -842,45 +757,71 @@ class TestAnyOrder:
 
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ([11, -1], [GreaterThan(10), LessThan(0)], True),
-                ([-1, 11], [GreaterThan(10), LessThan(0)], True),
-                ([11, 12], [GreaterThan(10), LessThan(0)], False),
-                ([1, 2], [GreaterThan(0), GreaterThan(0)], True),
-                ([15, 5], [GreaterThan(0), GreaterThan(10)], True),
-                ([5, 15], [GreaterThan(10), GreaterThan(0)], True),
-                ([5, 6], [GreaterThan(0), GreaterThan(10)], False),
-                ([15, 5], [GreaterThan(10), GreaterThan(10)], False),
-                ([15, -1, 5], [GreaterThan(0), GreaterThan(10), LessThan(0)], True),
-                ([15, -1, 5], [GreaterThan(0), LessThan(10), LessThan(0)], True),
-                ([2, 1], [Equals(1), Equals(2)], True),
-                ([1, 1], [Equals(1), Equals(1)], True),
-                ([1, 2], [Equals(1), Equals(1)], False),
-                ([1, "x"], [Anything(), Anything()], True),
-                ([1], [Anything(), Anything()], False),
-                (["x", 1], [Anything(), Equals(1)], True),
-                (["x", 2], [Anything(), Equals(1)], False),
-            ]
-        ),
-        ids=[
-            "greater-and-less",
-            "swapped-greater-and-less",
-            "both-greater",
-            "two-positive",
-            "backtrack-large-first",
-            "backtrack-large-second",
-            "no-large-enough",
-            "both-need-the-large-one",
-            "three-with-greater",
-            "three-with-less",
-            "equals-swapped",
-            "equals-duplicates",
-            "equals-missing-duplicate",
-            "two-anything",
-            "anything-too-short",
-            "anything-then-equals",
-            "anything-then-wrong-equals",
+        [
+            pytest.param(
+                [11, -1], [GreaterThan(10), LessThan(0)], True, id="greater-and-less"
+            ),
+            pytest.param(
+                [-1, 11],
+                [GreaterThan(10), LessThan(0)],
+                True,
+                id="swapped-greater-and-less",
+            ),
+            pytest.param(
+                [11, 12], [GreaterThan(10), LessThan(0)], False, id="both-greater"
+            ),
+            pytest.param(
+                [1, 2], [GreaterThan(0), GreaterThan(0)], True, id="two-positive"
+            ),
+            pytest.param(
+                [15, 5],
+                [GreaterThan(0), GreaterThan(10)],
+                True,
+                id="backtrack-large-first",
+            ),
+            pytest.param(
+                [5, 15],
+                [GreaterThan(10), GreaterThan(0)],
+                True,
+                id="backtrack-large-second",
+            ),
+            pytest.param(
+                [5, 6], [GreaterThan(0), GreaterThan(10)], False, id="no-large-enough"
+            ),
+            pytest.param(
+                [15, 5],
+                [GreaterThan(10), GreaterThan(10)],
+                False,
+                id="both-need-the-large-one",
+            ),
+            pytest.param(
+                [15, -1, 5],
+                [GreaterThan(0), GreaterThan(10), LessThan(0)],
+                True,
+                id="three-with-greater",
+            ),
+            pytest.param(
+                [15, -1, 5],
+                [GreaterThan(0), LessThan(10), LessThan(0)],
+                True,
+                id="three-with-less",
+            ),
+            pytest.param([2, 1], [Equals(1), Equals(2)], True, id="equals-swapped"),
+            pytest.param([1, 1], [Equals(1), Equals(1)], True, id="equals-duplicates"),
+            pytest.param(
+                [1, 2], [Equals(1), Equals(1)], False, id="equals-missing-duplicate"
+            ),
+            pytest.param([1, "x"], [Anything(), Anything()], True, id="two-anything"),
+            pytest.param([1], [Anything(), Anything()], False, id="anything-too-short"),
+            pytest.param(
+                ["x", 1], [Anything(), Equals(1)], True, id="anything-then-equals"
+            ),
+            pytest.param(
+                ["x", 2],
+                [Anything(), Equals(1)],
+                False,
+                id="anything-then-wrong-equals",
+            ),
         ],
     )
     def test_applies_matcher_items(
@@ -893,45 +834,24 @@ class TestAnyOrder:
 
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ("ba", ["a", "b"], True),
-                (["a", "b"], "ba", True),
-                ("ab", ["b", "a"], True),
-                ("ab", "ba", True),
-                ("ab", ["a"], False),
-                ("ab", ["a", "b", "c"], False),
-                ("", [], True),
-                ([], "", True),
-                (UserString("ba"), ["a", "b"], True),
-                (["a", "b"], UserString("ba"), True),
-                (b"ba", [98, 97], True),
-                ([97, 98], b"ab", True),
-                (bytearray(b"ba"), [98, 97], True),
-                (memoryview(b"ba"), [98, 97], True),
-                ([97, 98], bytearray(b"ba"), True),
-                ("ab", b"ab", False),
-                (b"ab", ["a", "b"], False),
-            ]
-        ),
-        ids=[
-            "str-chars",
-            "chars-str",
-            "reversed-chars",
-            "str-str",
-            "short-expected",
-            "long-expected",
-            "empty-str",
-            "empty-list",
-            "userstring-chars",
-            "chars-userstring",
-            "bytes-ints",
-            "ints-bytes",
-            "bytearray-ints",
-            "memoryview-ints",
-            "ints-bytearray",
-            "str-vs-bytes",
-            "bytes-vs-chars",
+        [
+            pytest.param("ba", ["a", "b"], True, id="str-chars"),
+            pytest.param(["a", "b"], "ba", True, id="chars-str"),
+            pytest.param("ab", ["b", "a"], True, id="reversed-chars"),
+            pytest.param("ab", "ba", True, id="str-str"),
+            pytest.param("ab", ["a"], False, id="short-expected"),
+            pytest.param("ab", ["a", "b", "c"], False, id="long-expected"),
+            pytest.param("", [], True, id="empty-str"),
+            pytest.param([], "", True, id="empty-list"),
+            pytest.param(UserString("ba"), ["a", "b"], True, id="userstring-chars"),
+            pytest.param(["a", "b"], UserString("ba"), True, id="chars-userstring"),
+            pytest.param(b"ba", [98, 97], True, id="bytes-ints"),
+            pytest.param([97, 98], b"ab", True, id="ints-bytes"),
+            pytest.param(bytearray(b"ba"), [98, 97], True, id="bytearray-ints"),
+            pytest.param(memoryview(b"ba"), [98, 97], True, id="memoryview-ints"),
+            pytest.param([97, 98], bytearray(b"ba"), True, id="ints-bytearray"),
+            pytest.param("ab", b"ab", False, id="str-vs-bytes"),
+            pytest.param(b"ab", ["a", "b"], False, id="bytes-vs-chars"),
         ],
     )
     def test_compares_string_like_values_by_elements(
@@ -944,39 +864,23 @@ class TestAnyOrder:
 
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Collection[object], bool]](
-            [
-                ({1, 2}, [2, 1], True),
-                ([1, 2], {2, 1}, True),
-                (frozenset({1, 2}), [2, 1], True),
-                ({1, 2}, [1, 3], False),
-                ("ba", {"a", "b"}, True),
-                ({"b": 1, "a": 2}, ["a", "b"], True),
-                (["a", "b"], {"b": 1, "a": 2}, True),
-                ({"a": 1, "b": 2}.keys(), ["b", "a"], True),
-                ({"a": 1, "b": 2}.values(), [2, 1], True),
-                ({"a": 1, "b": 2}.items(), [("b", 2), ("a", 1)], True),
-                (set[object](), [], True),
-                ({}, [], True),
-                ([], {}, True),
-                ({"a": 1}, ["a", "b"], False),
-            ]
-        ),
-        ids=[
-            "set-list",
-            "list-set",
-            "frozenset",
-            "different-set",
-            "str-set",
-            "dict-keys-as-list",
-            "list-dict-keys",
-            "keys-view",
-            "values-view",
-            "items-view",
-            "empty-set",
-            "empty-dict",
-            "empty-list-dict",
-            "missing-key",
+        [
+            pytest.param({1, 2}, [2, 1], True, id="set-list"),
+            pytest.param([1, 2], {2, 1}, True, id="list-set"),
+            pytest.param(frozenset({1, 2}), [2, 1], True, id="frozenset"),
+            pytest.param({1, 2}, [1, 3], False, id="different-set"),
+            pytest.param("ba", {"a", "b"}, True, id="str-set"),
+            pytest.param({"b": 1, "a": 2}, ["a", "b"], True, id="dict-keys-as-list"),
+            pytest.param(["a", "b"], {"b": 1, "a": 2}, True, id="list-dict-keys"),
+            pytest.param({"a": 1, "b": 2}.keys(), ["b", "a"], True, id="keys-view"),
+            pytest.param({"a": 1, "b": 2}.values(), [2, 1], True, id="values-view"),
+            pytest.param(
+                {"a": 1, "b": 2}.items(), [("b", 2), ("a", 1)], True, id="items-view"
+            ),
+            pytest.param(set[object](), [], True, id="empty-set"),
+            pytest.param({}, [], True, id="empty-dict"),
+            pytest.param([], {}, True, id="empty-list-dict"),
+            pytest.param({"a": 1}, ["a", "b"], False, id="missing-key"),
         ],
     )
     def test_matches_non_sequence_collections_by_iteration(
@@ -987,7 +891,14 @@ class TestAnyOrder:
     ) -> None:
         assert AnyOrder(expected).matches(value) is matched
 
-    @pytest.mark.parametrize("value", [1, None, True], ids=["int", "none", "bool"])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            pytest.param(1, id="int"),
+            pytest.param(None, id="none"),
+            pytest.param(True, id="bool"),
+        ],
+    )
     def test_rejects_a_non_collection(self, value: object) -> None:
         assert AnyOrder([1]).matches(value) is False
 
@@ -1008,33 +919,25 @@ class TestAnyOrder:
 class TestPartialMapping:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
-        list[tuple[object, Mapping[object, object], bool]](
-            [
-                ({"a": 1, "b": 2}, {"a": 1}, True),
-                ({"status": "ok", "id": 1}, {"status": "ok"}, True),
-                ({"a": 1}, {"a": 1, "b": 2}, False),
-                ({"a": 1}, {"b": 1}, False),
-                ({"a": 1}, {}, True),
-                ({}, {}, True),
-                (UserDict({"a": 1, "b": 2}), {"b": 2}, True),
-                (MappingProxyType({"a": 1, "extra": 9}), {"a": 1}, True),
-                ([("a", 1)], {"a": 1}, False),
-                (None, {"a": 1}, False),
-                (1, {}, False),
-            ]
-        ),
-        ids=[
-            "extra-key",
-            "status-with-id",
-            "missing-key",
-            "wrong-key",
-            "empty-expected",
-            "empty-mapping",
-            "user-dict",
-            "mapping-proxy",
-            "list",
-            "none",
-            "int",
+        [
+            pytest.param({"a": 1, "b": 2}, {"a": 1}, True, id="extra-key"),
+            pytest.param(
+                {"status": "ok", "id": 1}, {"status": "ok"}, True, id="status-with-id"
+            ),
+            pytest.param({"a": 1}, {"a": 1, "b": 2}, False, id="missing-key"),
+            pytest.param({"a": 1}, {"b": 1}, False, id="wrong-key"),
+            pytest.param({"a": 1}, {}, True, id="empty-expected"),
+            pytest.param({}, {}, True, id="empty-mapping"),
+            pytest.param(UserDict({"a": 1, "b": 2}), {"b": 2}, True, id="user-dict"),
+            pytest.param(
+                MappingProxyType({"a": 1, "extra": 9}),
+                {"a": 1},
+                True,
+                id="mapping-proxy",
+            ),
+            pytest.param([("a", 1)], {"a": 1}, False, id="list"),
+            pytest.param(None, {"a": 1}, False, id="none"),
+            pytest.param(1, {}, False, id="int"),
         ],
     )
     def test_matches(
@@ -1090,30 +993,17 @@ class TestOrdering:
     @pytest.mark.parametrize(
         ("matcher", "value", "expected"),
         [
-            (LessThan(3), 2, True),
-            (LessThan(3), 3, False),
-            (GreaterThan(3), 4, True),
-            (GreaterThan(3), 3, False),
-            (LessEquals(3), 3, True),
-            (LessEquals(3), 4, False),
-            (GreaterEquals(3), 3, True),
-            (GreaterEquals(3), 2, False),
-            (Range(0, 10), 5, True),
-            (Range(0, 10), 0, False),
-            (Range(0, 10), 10, False),
-        ],
-        ids=[
-            "less-than",
-            "less-than-equal",
-            "greater-than",
-            "greater-than-equal",
-            "less-equals",
-            "less-equals-above",
-            "greater-equals",
-            "greater-equals-below",
-            "inside-range",
-            "range-left-edge",
-            "range-right-edge",
+            pytest.param(LessThan(3), 2, True, id="less-than"),
+            pytest.param(LessThan(3), 3, False, id="less-than-equal"),
+            pytest.param(GreaterThan(3), 4, True, id="greater-than"),
+            pytest.param(GreaterThan(3), 3, False, id="greater-than-equal"),
+            pytest.param(LessEquals(3), 3, True, id="less-equals"),
+            pytest.param(LessEquals(3), 4, False, id="less-equals-above"),
+            pytest.param(GreaterEquals(3), 3, True, id="greater-equals"),
+            pytest.param(GreaterEquals(3), 2, False, id="greater-equals-below"),
+            pytest.param(Range(0, 10), 5, True, id="inside-range"),
+            pytest.param(Range(0, 10), 0, False, id="range-left-edge"),
+            pytest.param(Range(0, 10), 10, False, id="range-right-edge"),
         ],
     )
     def test_matches(self, matcher: Matcher, value: int, expected: bool) -> None:
@@ -1122,13 +1012,12 @@ class TestOrdering:
     @pytest.mark.parametrize(
         ("matcher", "text"),
         [
-            (LessThan(3), "LessThan(3)"),
-            (GreaterThan(3), "GreaterThan(3)"),
-            (LessEquals(3), "LessEquals(3)"),
-            (GreaterEquals(3), "GreaterEquals(3)"),
-            (Range(0, 10), "Range(left=0, right=10)"),
+            pytest.param(LessThan(3), "LessThan(3)", id="less-than"),
+            pytest.param(GreaterThan(3), "GreaterThan(3)", id="greater-than"),
+            pytest.param(LessEquals(3), "LessEquals(3)", id="less-equals"),
+            pytest.param(GreaterEquals(3), "GreaterEquals(3)", id="greater-equals"),
+            pytest.param(Range(0, 10), "Range(left=0, right=10)", id="range"),
         ],
-        ids=["less-than", "greater-than", "less-equals", "greater-equals", "range"],
     )
     def test_repr(self, matcher: Matcher, text: str) -> None:
         assert repr(matcher) == text
@@ -1217,11 +1106,10 @@ class TestRegex:
     @pytest.mark.parametrize(
         ("matcher", "value"),
         [
-            (RegexMatch("a"), 1),
-            (RegexSearch("a"), None),
-            (RegexFullmatch("a"), b"a"),
+            pytest.param(RegexMatch("a"), 1, id="match-int"),
+            pytest.param(RegexSearch("a"), None, id="search-none"),
+            pytest.param(RegexFullmatch("a"), b"a", id="fullmatch-bytes"),
         ],
-        ids=["match-int", "search-none", "fullmatch-bytes"],
     )
     def test_rejects_non_string(self, matcher: Matcher, value: object) -> None:
         assert matcher.matches(value) is False
@@ -1243,14 +1131,22 @@ class TestRegex:
     @pytest.mark.parametrize(
         ("matcher", "text"),
         [
-            (RegexMatch(r"k.*"), "RegexMatch(expected='k.*', flags=re.NOFLAG)"),
-            (RegexSearch("ey"), "RegexSearch(expected='ey', flags=re.NOFLAG)"),
-            (
+            pytest.param(
+                RegexMatch(r"k.*"),
+                "RegexMatch(expected='k.*', flags=re.NOFLAG)",
+                id="match",
+            ),
+            pytest.param(
+                RegexSearch("ey"),
+                "RegexSearch(expected='ey', flags=re.NOFLAG)",
+                id="search",
+            ),
+            pytest.param(
                 RegexFullmatch(r"k.y"),
                 "RegexFullmatch(expected='k.y', flags=re.NOFLAG)",
+                id="fullmatch",
             ),
         ],
-        ids=["match", "search", "fullmatch"],
     )
     def test_repr(self, matcher: Matcher, text: str) -> None:
         assert repr(matcher) == text
@@ -1265,8 +1161,12 @@ class TestIsNow:
 
     @pytest.mark.parametrize(
         "value",
-        [datetime(2020, 1, 1), datetime(2020, 1, 1, tzinfo=UTC), "now", None],
-        ids=["naive", "aware", "str", "none"],
+        [
+            pytest.param(datetime(2020, 1, 1), id="naive"),
+            pytest.param(datetime(2020, 1, 1, tzinfo=UTC), id="aware"),
+            pytest.param("now", id="str"),
+            pytest.param(None, id="none"),
+        ],
     )
     def test_rejects_distant_or_non_datetime(self, value: object) -> None:
         assert IsNow().matches(value) is False
@@ -1299,49 +1199,26 @@ class TestIsUUID:
 
     @pytest.mark.parametrize(
         ("value", "version", "matched"),
-        list[tuple[object, int, bool]](
-            [
-                (UUID4, 4, True),
-                (UUID4, 1, False),
-                (UUID4, 5, False),
-                (UUID1, 1, True),
-                (UUID1, 4, False),
-                (UUID5, 5, True),
-                (UUID5, 4, False),
-                (UUID(int=0), 4, False),
-                (str(UUID4), 4, True),
-                (str(UUID4), 1, False),
-                (str(UUID1), 4, False),
-                (str(UUID4).upper(), 4, True),
-                ("urn:uuid:" + str(UUID1), 4, False),
-                (UUID4.hex, 4, True),
-                (str(UUID(int=0)), 4, False),
-                ("123", 4, False),
-                (None, 4, False),
-                (1, 4, False),
-                (UUID4.bytes, 4, False),
-            ]
-        ),
-        ids=[
-            "uuid4-version-4",
-            "uuid4-version-1",
-            "uuid4-version-5",
-            "uuid1-version-1",
-            "uuid1-version-4",
-            "uuid5-version-5",
-            "uuid5-version-4",
-            "nil-version-4",
-            "uuid4-string-version-4",
-            "uuid4-string-version-1",
-            "uuid1-string-version-4",
-            "uppercase-version-4",
-            "urn-version-4",
-            "hex-version-4",
-            "nil-string-version-4",
-            "invalid-string",
-            "none",
-            "int",
-            "bytes",
+        [
+            pytest.param(UUID4, 4, True, id="uuid4-version-4"),
+            pytest.param(UUID4, 1, False, id="uuid4-version-1"),
+            pytest.param(UUID4, 5, False, id="uuid4-version-5"),
+            pytest.param(UUID1, 1, True, id="uuid1-version-1"),
+            pytest.param(UUID1, 4, False, id="uuid1-version-4"),
+            pytest.param(UUID5, 5, True, id="uuid5-version-5"),
+            pytest.param(UUID5, 4, False, id="uuid5-version-4"),
+            pytest.param(UUID(int=0), 4, False, id="nil-version-4"),
+            pytest.param(str(UUID4), 4, True, id="uuid4-string-version-4"),
+            pytest.param(str(UUID4), 1, False, id="uuid4-string-version-1"),
+            pytest.param(str(UUID1), 4, False, id="uuid1-string-version-4"),
+            pytest.param(str(UUID4).upper(), 4, True, id="uppercase-version-4"),
+            pytest.param("urn:uuid:" + str(UUID1), 4, False, id="urn-version-4"),
+            pytest.param(UUID4.hex, 4, True, id="hex-version-4"),
+            pytest.param(str(UUID(int=0)), 4, False, id="nil-string-version-4"),
+            pytest.param("123", 4, False, id="invalid-string"),
+            pytest.param(None, 4, False, id="none"),
+            pytest.param(1, 4, False, id="int"),
+            pytest.param(UUID4.bytes, 4, False, id="bytes"),
         ],
     )
     def test_matches_requested_version(
@@ -1351,33 +1228,18 @@ class TestIsUUID:
 
     @pytest.mark.parametrize(
         ("value", "matched"),
-        list[tuple[object, bool]](
-            [
-                (UUID4, True),
-                (UUID1, True),
-                (UUID5, True),
-                (UUID(int=0), True),
-                (str(UUID5), True),
-                ("{" + str(UUID4) + "}", True),
-                ("not-a-uuid", False),
-                ("", False),
-                (" " + str(UUID4), False),
-                (None, False),
-                (UUID4.bytes, False),
-            ]
-        ),
-        ids=[
-            "uuid4",
-            "uuid1",
-            "uuid5",
-            "nil",
-            "string",
-            "braces",
-            "invalid-string",
-            "empty-string",
-            "leading-space",
-            "none",
-            "bytes",
+        [
+            pytest.param(UUID4, True, id="uuid4"),
+            pytest.param(UUID1, True, id="uuid1"),
+            pytest.param(UUID5, True, id="uuid5"),
+            pytest.param(UUID(int=0), True, id="nil"),
+            pytest.param(str(UUID5), True, id="string"),
+            pytest.param("{" + str(UUID4) + "}", True, id="braces"),
+            pytest.param("not-a-uuid", False, id="invalid-string"),
+            pytest.param("", False, id="empty-string"),
+            pytest.param(" " + str(UUID4), False, id="leading-space"),
+            pytest.param(None, False, id="none"),
+            pytest.param(UUID4.bytes, False, id="bytes"),
         ],
     )
     def test_matches_any_version(self, value: object, matched: bool) -> None:
@@ -1435,43 +1297,23 @@ class TestIsDataclass:
 
     @pytest.mark.parametrize(
         ("value", "matched"),
-        list[tuple[object, bool]](
-            [
-                (Item("n"), True),
-                (FrozenItem("n"), True),
-                (SlotsItem("n"), True),
-                (ItemChild("n"), True),
-                (Made("n"), True),
-                (Item, False),
-                (FrozenItem, False),
-                (SlotsItem, False),
-                (ItemChild, False),
-                (Made, False),
-                (Plain(), False),
-                (Plain, False),
-                (Point("n"), False),
-                (object(), False),
-                (None, False),
-                ("n", False),
-            ]
-        ),
-        ids=[
-            "instance",
-            "frozen-instance",
-            "slots-instance",
-            "subclass-instance",
-            "made-instance",
-            "class",
-            "frozen-class",
-            "slots-class",
-            "subclass",
-            "made-class",
-            "plain-instance",
-            "plain-class",
-            "namedtuple",
-            "object",
-            "none",
-            "str",
+        [
+            pytest.param(Item("n"), True, id="instance"),
+            pytest.param(FrozenItem("n"), True, id="frozen-instance"),
+            pytest.param(SlotsItem("n"), True, id="slots-instance"),
+            pytest.param(ItemChild("n"), True, id="subclass-instance"),
+            pytest.param(Made("n"), True, id="made-instance"),
+            pytest.param(Item, False, id="class"),
+            pytest.param(FrozenItem, False, id="frozen-class"),
+            pytest.param(SlotsItem, False, id="slots-class"),
+            pytest.param(ItemChild, False, id="subclass"),
+            pytest.param(Made, False, id="made-class"),
+            pytest.param(Plain(), False, id="plain-instance"),
+            pytest.param(Plain, False, id="plain-class"),
+            pytest.param(Point("n"), False, id="namedtuple"),
+            pytest.param(object(), False, id="object"),
+            pytest.param(None, False, id="none"),
+            pytest.param("n", False, id="str"),
         ],
     )
     def test_matches_an_instance(self, value: object, matched: bool) -> None:
@@ -1479,39 +1321,21 @@ class TestIsDataclass:
 
     @pytest.mark.parametrize(
         ("value", "matched"),
-        list[tuple[object, bool]](
-            [
-                (Item("n"), True),
-                (Item, True),
-                (FrozenItem("n"), True),
-                (FrozenItem, True),
-                (SlotsItem("n"), True),
-                (SlotsItem, True),
-                (ItemChild("n"), True),
-                (ItemChild, True),
-                (Made("n"), True),
-                (Made, True),
-                (Plain(), False),
-                (Plain, False),
-                (Point, False),
-                (1, False),
-            ]
-        ),
-        ids=[
-            "instance",
-            "class",
-            "frozen-instance",
-            "frozen-class",
-            "slots-instance",
-            "slots-class",
-            "subclass-instance",
-            "subclass",
-            "made-instance",
-            "made-class",
-            "plain-instance",
-            "plain-class",
-            "namedtuple",
-            "int",
+        [
+            pytest.param(Item("n"), True, id="instance"),
+            pytest.param(Item, True, id="class"),
+            pytest.param(FrozenItem("n"), True, id="frozen-instance"),
+            pytest.param(FrozenItem, True, id="frozen-class"),
+            pytest.param(SlotsItem("n"), True, id="slots-instance"),
+            pytest.param(SlotsItem, True, id="slots-class"),
+            pytest.param(ItemChild("n"), True, id="subclass-instance"),
+            pytest.param(ItemChild, True, id="subclass"),
+            pytest.param(Made("n"), True, id="made-instance"),
+            pytest.param(Made, True, id="made-class"),
+            pytest.param(Plain(), False, id="plain-instance"),
+            pytest.param(Plain, False, id="plain-class"),
+            pytest.param(Point, False, id="namedtuple"),
+            pytest.param(1, False, id="int"),
         ],
     )
     def test_matches_a_class_or_instance(self, value: object, matched: bool) -> None:
