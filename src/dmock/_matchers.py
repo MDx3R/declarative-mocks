@@ -342,28 +342,64 @@ class AnythingOfType(Matcher):
     """Matches a value that is an instance of the given type.
 
     Args:
-        expected_type: Type accepted by ``isinstance``.
+        expected: Type accepted by ``isinstance``.
+        exact: When True, the value's type must be `expected` itself.
 
     Examples:
-        >>> from dmock import AnythingOfType, DeclarativeMock
+        >>> from dmock import AnythingOfType, DeclarativeMock, AnythingOfType
+        >>> True == AnythingOfType(int)
+        True
+        >>> True == AnythingOfType(int, exact=True)
+        False
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
         >>> mock.expect("fetch", AnythingOfType(str)).returns("ok")
-        Expectation(fetch(AnythingOfType(str)))
+        Expectation(fetch(AnythingOfType(str, exact=False)))
         >>> mock.fetch("a")
         'ok'
     """
 
-    def __init__(self, expected_type: type, /) -> None:
-        self._expected_type = expected_type
+    def __init__(self, expected: type, /, *, exact: bool = False) -> None:
+        self._expected = expected
+        self._exact = exact
 
     def matches(self, value: object, /) -> bool:
         """Return whether `value` is an instance of the expected type."""
-        return isinstance(value, self._expected_type)
+        return (
+            type(value) is self._expected
+            if self._exact
+            else isinstance(value, self._expected)
+        )
 
     def __repr__(self) -> str:
-        return f"AnythingOfType({self._expected_type.__name__})"
+        return f"AnythingOfType({self._expected.__name__}, exact={self._exact})"
+
+
+InstanceOf = AnythingOfType
+"""Alias of :class:`InstanceOf`.
+
+``InstanceOf(expected)`` constructs that matcher. ``exact`` defaults to
+False, so a subclass matches. ``exact=True`` requires
+``type(value) is expected``.
+
+Examples:
+    >>> from dmock import AnythingOfType, InstanceOf
+    >>> InstanceOf is AnythingOfType
+    True
+    >>> True == InstanceOf(int)
+    True
+    >>> True == InstanceOf(int, exact=True)
+    False
+    >>> class Base:
+    ...     pass
+    >>> class Child(Base):
+    ...     pass
+    >>> Child() == InstanceOf(Base)
+    True
+    >>> Child() == InstanceOf(Base, exact=True)
+    False
+"""
 
 
 class Equals(Matcher):
@@ -722,7 +758,7 @@ class Includes(Matcher):
         return f"Includes({', '.join(map(repr, self._items))})"
 
 
-class CollectionEquals(Matcher):
+class CollectionOf(Matcher):
     """Matches a sequence, set, or mapping of the same kind as `expected`.
 
     Order matters for sequences. Sets and mappings ignore order. A different
@@ -741,33 +777,33 @@ class CollectionEquals(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import CollectionEquals
-        >>> (1, 2, 3) == CollectionEquals([1, 2, 3])
+        >>> from dmock import CollectionOf
+        >>> (1, 2, 3) == CollectionOf([1, 2, 3])
         True
-        >>> (1, 2, 3) == CollectionEquals({1, 2, 3})
+        >>> (1, 2, 3) == CollectionOf({1, 2, 3})
         False
-        >>> "ab" == CollectionEquals(["a", "b"])
+        >>> "ab" == CollectionOf(["a", "b"])
         True
-        >>> ["a", "b"] == CollectionEquals("ab")
+        >>> ["a", "b"] == CollectionOf("ab")
         True
-        >>> b"ab" == CollectionEquals(bytearray(b"ab"))
+        >>> b"ab" == CollectionOf(bytearray(b"ab"))
         True
-        >>> [97, 98] == CollectionEquals(b"ab")
+        >>> [97, 98] == CollectionOf(b"ab")
         True
-        >>> bytearray(b"ab") == CollectionEquals(memoryview(b"ab"))
+        >>> bytearray(b"ab") == CollectionOf(memoryview(b"ab"))
         True
         >>> from collections import UserString
-        >>> UserString("ab") == CollectionEquals("ab")
+        >>> UserString("ab") == CollectionOf("ab")
         True
-        >>> "ab" == CollectionEquals(UserString("ab"))
+        >>> "ab" == CollectionOf(UserString("ab"))
         True
-        >>> "ab" == CollectionEquals(b"ab")
+        >>> "ab" == CollectionOf(b"ab")
         False
         >>> class Service:
         ...     def fetch(self, items: tuple[int, ...]) -> str: ...
         >>> mock = DeclarativeMock(Service)
-        >>> mock.expect("fetch", CollectionEquals([1, 2, 3])).returns("ok")
-        Expectation(fetch(CollectionEquals([1, 2, 3])))
+        >>> mock.expect("fetch", CollectionOf([1, 2, 3])).returns("ok")
+        Expectation(fetch(CollectionOf([1, 2, 3])))
         >>> mock.fetch((1, 2, 3))
         'ok'
     """
@@ -805,7 +841,133 @@ class CollectionEquals(Matcher):
         return False
 
     def __repr__(self) -> str:
-        return f"CollectionEquals({self._expected!r})"
+        return f"CollectionOf({self._expected!r})"
+
+
+class SequenceOf(Matcher):
+    """Matches a sequence with the same elements in the same order.
+
+    A set or mapping does not match. ``str``, ``bytes``, ``bytearray``,
+    ``memoryview``, and :class:`collections.UserString` are sequences of
+    their elements, as with :class:`CollectionOf`.
+
+    Args:
+        expected: Sequence to compare against.
+
+    Raises:
+        TypeError: `expected` is not a sequence.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, SequenceOf
+        >>> (1, 2) == SequenceOf([1, 2])
+        True
+        >>> "ab" == SequenceOf(["a", "b"])
+        True
+        >>> {1, 2} == SequenceOf([1, 2])
+        False
+        >>> class Service:
+        ...     def fetch(self, items: tuple[int, ...]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", SequenceOf([1, 2])).returns("ok")
+        Expectation(fetch(SequenceOf([1, 2])))
+        >>> mock.fetch((1, 2))
+        'ok'
+    """
+
+    def __init__(self, expected: Sequence[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a sequence of the same elements."""
+        if not isinstance(value, Sequence):
+            return False
+
+        return CollectionOf(self._expected).matches(cast("Sequence[object]", value))
+
+    def __repr__(self) -> str:
+        return f"SequenceOf({self._expected!r})"
+
+
+class SetOf(Matcher):
+    """Matches a set with the same elements.
+
+    Order is ignored. A sequence or mapping does not match.
+
+    Args:
+        expected: Set to compare against.
+
+    Raises:
+        TypeError: `expected` is not a set.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, SetOf
+        >>> frozenset({1, 2}) == SetOf({2, 1})
+        True
+        >>> [1, 2] == SetOf({1, 2})
+        False
+        >>> class Service:
+        ...     def fetch(self, items: set[int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", SetOf({1, 2})).returns("ok")
+        Expectation(fetch(SetOf({1, 2})))
+        >>> mock.fetch({2, 1})
+        'ok'
+    """
+
+    def __init__(self, expected: Set[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a set of the same elements."""
+        if not isinstance(value, Set):
+            return False
+
+        return CollectionOf(self._expected).matches(cast("Set[object]", value))
+
+    def __repr__(self) -> str:
+        return f"SetOf({self._expected!r})"
+
+
+class MappingOf(Matcher):
+    """Matches a mapping with the same keys and values.
+
+    Key order is ignored. A sequence does not match. Extra keys do not match.
+
+    Args:
+        expected: Mapping to compare against.
+
+    Raises:
+        TypeError: `expected` is not a mapping.
+
+    Examples:
+        >>> from dmock import DeclarativeMock, MappingOf
+        >>> {"b": 1, "a": 2} == MappingOf({"a": 2, "b": 1})
+        True
+        >>> {"a": 1, "b": 2} == MappingOf({"a": 1})
+        False
+        >>> class Service:
+        ...     def save(self, item: dict[str, int]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("save", MappingOf({"a": 1})).returns("ok")
+        Expectation(save(MappingOf({'a': 1})))
+        >>> mock.save({"a": 1})
+        'ok'
+    """
+
+    def __init__(self, expected: Mapping[object, object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether `value` is a mapping of the same pairs."""
+        if not isinstance(value, Mapping):
+            return False
+
+        return CollectionOf(self._expected).matches(
+            cast("Mapping[object, object]", value)
+        )
+
+    def __repr__(self) -> str:
+        return f"MappingOf({self._expected!r})"
 
 
 class Attr(Matcher):

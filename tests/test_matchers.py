@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import UserDict, UserString
-from collections.abc import Collection
+from collections.abc import Collection, Mapping, Sequence, Set
 from datetime import UTC, datetime
 from types import MappingProxyType
 
@@ -24,7 +24,7 @@ from dmock import (
     Approx,
     Args,
     Attr,
-    CollectionEquals,
+    CollectionOf,
     Contains,
     Empty,
     EndsWith,
@@ -33,9 +33,11 @@ from dmock import (
     GreaterThan,
     In,
     Includes,
+    InstanceOf,
     Is,
     LessEquals,
     LessThan,
+    MappingOf,
     MatchedBy,
     Matcher,
     Maybe,
@@ -48,6 +50,8 @@ from dmock import (
     RegexFullmatch,
     RegexMatch,
     RegexSearch,
+    SequenceOf,
+    SetOf,
     StartsWith,
 )
 from dmock._matchers import (
@@ -93,11 +97,46 @@ class TestAnythingOfType:
     def test_rejects_none_for_int(self) -> None:
         assert AnythingOfType(int).matches(None) is False
 
+    def test_alias_is_instance_of(self) -> None:
+        assert AnythingOfType is InstanceOf
+
+    @pytest.mark.parametrize(
+        ("matcher", "value", "matched"),
+        [
+            (AnythingOfType(int), True, True),
+            (AnythingOfType(int, exact=True), True, False),
+            (AnythingOfType(bool, exact=True), True, True),
+            (AnythingOfType(int, exact=True), 1, True),
+            (InstanceOf(int), True, True),
+            (InstanceOf(int, exact=True), True, False),
+        ],
+    )
+    def test_exact_controls_subclass_matching(
+        self,
+        matcher: Matcher,
+        value: object,
+        matched: bool,
+    ) -> None:
+        assert matcher.matches(value) is matched
+
+    def test_exact_rejects_a_subclass(self) -> None:
+        class Base:
+            pass
+
+        class Child(Base):
+            pass
+
+        assert AnythingOfType(Base, exact=True).matches(Child()) is False
+
     def test_repr(self) -> None:
-        assert repr(AnythingOfType(int)) == "AnythingOfType(int)"
+        assert repr(AnythingOfType(int)) == "AnythingOfType(int, exact=False)"
+        assert (
+            repr(AnythingOfType(int, exact=True)) == "AnythingOfType(int, exact=True)"
+        )
 
     def test_satisfies_matcher_protocol(self) -> None:
         assert isinstance(AnythingOfType(int), Matcher)
+        assert isinstance(AnythingOfType(str), Matcher)
 
 
 class TestMatchedBy:
@@ -343,7 +382,7 @@ class TestIncludes:
         assert repr(Includes("a", "b")) == "Includes('a', 'b')"
 
 
-class TestCollectionEquals:
+class TestCollectionOf:
     @pytest.mark.parametrize(
         ("value", "expected", "matched"),
         list[tuple[object, Collection[object], bool]](
@@ -409,22 +448,120 @@ class TestCollectionEquals:
         expected: Collection[object],
         matched: bool,
     ) -> None:
-        assert CollectionEquals(expected).matches(value) is matched
+        assert CollectionOf(expected).matches(value) is matched
 
     @pytest.mark.parametrize(
         ("expected", "text"),
         [
-            ([1, 2, 3], "CollectionEquals([1, 2, 3])"),
-            ("ab", "CollectionEquals('ab')"),
-            (b"ab", "CollectionEquals(b'ab')"),
-            ({1, 2}, "CollectionEquals({1, 2})"),
+            ([1, 2, 3], "CollectionOf([1, 2, 3])"),
+            ("ab", "CollectionOf('ab')"),
+            (b"ab", "CollectionOf(b'ab')"),
+            ({1, 2}, "CollectionOf({1, 2})"),
         ],
     )
     def test_repr(self, expected: Collection[object], text: str) -> None:
-        assert repr(CollectionEquals(expected)) == text
+        assert repr(CollectionOf(expected)) == text
 
     def test_satisfies_matcher_protocol(self) -> None:
-        assert isinstance(CollectionEquals([]), Matcher)
+        assert isinstance(CollectionOf([]), Matcher)
+
+
+class TestSequenceOf:
+    @pytest.mark.parametrize(
+        ("value", "expected", "matched"),
+        list[tuple[object, Sequence[object], bool]](
+            [
+                ((1, 2, 3), [1, 2, 3], True),
+                ([1, 2, 3], (1, 2, 3), True),
+                ([1, 2], [2, 1], False),
+                ([1, 2], [1, 2, 3], False),
+                (range(3), [0, 1, 2], True),
+                ({1, 2, 3}, [1, 2, 3], False),
+                ({1, 2}, [1, 2], False),
+                ("ab", ["a", "b"], True),
+                (["a", "b"], "ab", True),
+                ("ab", ["b", "a"], False),
+                ("", [], True),
+                ({"a", "b"}, ["a", "b"], False),
+                (b"ab", [97, 98], True),
+                (bytearray(b"ab"), b"ab", True),
+                (memoryview(b"ab"), [97, 98], True),
+                ("ab", b"ab", False),
+                (UserString("ab"), "ab", True),
+                ("ab", UserString("ab"), True),
+                (1, [1], False),
+                (None, [], False),
+            ]
+        ),
+    )
+    def test_matches(
+        self,
+        value: object,
+        expected: Sequence[object],
+        matched: bool,
+    ) -> None:
+        assert SequenceOf(expected).matches(value) is matched
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(SequenceOf([]), Matcher)
+
+
+class TestSetOf:
+    @pytest.mark.parametrize(
+        ("value", "expected", "matched"),
+        list[tuple[object, Set[object], bool]](
+            [
+                ({1, 2}, {2, 1}, True),
+                (frozenset({1, 2}), {2, 1}, True),
+                ({1}, frozenset({1}), True),
+                ({1, 2}, frozenset({1, 3}), False),
+                ([1, 2], {1, 2}, False),
+                ((1, 2), {1, 2}, False),
+                ({"a": 1}, {1}, False),
+                ({1: "a", 2: "b"}.keys(), {1, 2}, True),
+                (1, {1}, False),
+            ]
+        ),
+    )
+    def test_matches(
+        self,
+        value: object,
+        expected: Set[object],
+        matched: bool,
+    ) -> None:
+        assert SetOf(expected).matches(value) is matched
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(SetOf({1}), Matcher)
+
+
+class TestMappingOf:
+    @pytest.mark.parametrize(
+        ("value", "expected", "matched"),
+        list[tuple[object, Mapping[object, object], bool]](
+            [
+                ({"b": 1, "a": 2}, {"a": 2, "b": 1}, True),
+                ({"a": 1}, {"a": 2}, False),
+                ({"a": 1, "b": 2}, {"a": 1}, False),
+                ({"a": 1}, {"a": 1, "b": 2}, False),
+                (UserDict({"a": 1}), {"a": 1}, True),
+                (MappingProxyType({"b": 1, "a": 2}), {"a": 2, "b": 1}, True),
+                ([("a", 1)], {"a": 1}, False),
+                ((("a", 1),), {"a": 1}, False),
+                (1, {"a": 1}, False),
+            ]
+        ),
+    )
+    def test_matches(
+        self,
+        value: object,
+        expected: Mapping[object, object],
+        matched: bool,
+    ) -> None:
+        assert MappingOf(expected).matches(value) is matched
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(MappingOf({"a": 1}), Matcher)
 
 
 class TestAttr:

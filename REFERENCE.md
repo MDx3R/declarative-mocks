@@ -101,34 +101,37 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 
 ## Matchers (argument predicates)
 
-| Matcher                             | Role                                                                 |
-| ----------------------------------- | -------------------------------------------------------------------- |
-| `Anything()` / `Anything`           | Matches any single value where placed                                |
-| `Nothing` / `Never`                 | Matches no value                                                     |
-| `AnythingOfType(type)`              | Value must be instance of `type`                                     |
-| `Equals(expected)`                  | Value equals `expected`                                              |
-| `Not(expected)`                     | Value is not equal to `expected`; `~matcher` wraps a matcher         |
-| `Maybe(expected)`                   | `None` or a value equal to `expected`                                |
-| `Is(expected)`                      | Value is the same object as `expected`                               |
-| `MatchedBy(predicate)`              | Custom predicate on the value                                        |
-| `TRUTHY` / `FALSY`                  | Truthy or falsy value                                                |
-| `NAIVE_DATETIME` / `AWARE_DATETIME` | Naive or timezone-aware `datetime`                                   |
-| `Empty()` / `EMPTY`                 | Sized value with length zero                                         |
-| `In(container)`                     | Value is a member of `container`                                     |
-| `Contains(item)`                    | Container holds `item`                                               |
-| `Includes(*items)`                  | Container holds every item                                           |
-| `CollectionEquals(expected)`        | Same sequence, set, or mapping kind.                                 |
-| `Attr(name)`                        | Object has attribute `name`                                          |
-| `Range(left, right)`                | Value is strictly inside the interval                                |
-| `LessThan` / `GreaterThan`          | Strict ordering                                                      |
-| `LessEquals` / `GreaterEquals`      | Inclusive ordering                                                   |
-| `Approx(expected)`                  | Number close to `expected` (`math.isclose`)                          |
-| `StartsWith` / `EndsWith`           | String prefix or suffix                                              |
-| `Regex` / `RegexMatch`              | `re.match` from the start of a string                                |
-| `RegexSearch`                       | `re.search` anywhere in a string                                     |
-| `RegexFullmatch`                    | `re.fullmatch` against the whole string                              |
-| `And` / `Or` / `Args`               | Every argument matches, or any argument matches. `&` and `\|` too    |
-| `dmock.ANY_ARGS, dmock.ANY_KWARGS`  | Wildcard matchers for any number of positional and keyword arguments |
+| Matcher                                     | Role                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `Anything()` / `Anything`                   | Matches any single value where placed                                |
+| `Nothing` / `Never`                         | Matches no value                                                     |
+| `InstanceOf(type)` / `AnythingOfType(type)` | Instance of `type`. `exact=True` requires that exact type.           |
+| `Equals(expected)`                          | Value equals `expected`                                              |
+| `Not(expected)`                             | Value is not equal to `expected`; `~matcher` wraps a matcher         |
+| `Maybe(expected)`                           | `None` or a value equal to `expected`                                |
+| `Is(expected)`                              | Value is the same object as `expected`                               |
+| `MatchedBy(predicate)`                      | Custom predicate on the value                                        |
+| `TRUTHY` / `FALSY`                          | Truthy or falsy value                                                |
+| `NAIVE_DATETIME` / `AWARE_DATETIME`         | Naive or timezone-aware `datetime`                                   |
+| `Empty()` / `EMPTY`                         | Sized value with length zero                                         |
+| `In(container)`                             | Value is a member of `container`                                     |
+| `Contains(item)`                            | Container holds `item`                                               |
+| `Includes(*items)`                          | Container holds every item                                           |
+| `CollectionOf(expected)`                    | Same sequence, set, or mapping kind                                  |
+| `SequenceOf(expected)`                      | Same sequence elements, in order                                     |
+| `SetOf(expected)`                           | Same set elements                                                    |
+| `MappingOf(expected)`                       | Same mapping pairs                                                   |
+| `Attr(name)`                                | Object has attribute `name`                                          |
+| `Range(left, right)`                        | Value is strictly inside the interval                                |
+| `LessThan` / `GreaterThan`                  | Strict ordering                                                      |
+| `LessEquals` / `GreaterEquals`              | Inclusive ordering                                                   |
+| `Approx(expected)`                          | Number close to `expected` (`math.isclose`)                          |
+| `StartsWith` / `EndsWith`                   | String prefix or suffix                                              |
+| `Regex` / `RegexMatch`                      | `re.match` from the start of a string                                |
+| `RegexSearch`                               | `re.search` anywhere in a string                                     |
+| `RegexFullmatch`                            | `re.fullmatch` against the whole string                              |
+| `And` / `Or` / `Args`                       | Every argument matches, or any argument matches. `&` and `\|` too    |
+| `dmock.ANY_ARGS, dmock.ANY_KWARGS`          | Wildcard matchers for any number of positional and keyword arguments |
 
 `Matcher` is a public protocol with a single `matches(value) -> bool` method. Implement it to add a custom matcher; built-in matchers already satisfy it. `ANY_ARGS` and `ANY_KWARGS` are sentinels, not `Matcher`s.
 

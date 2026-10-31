@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Generic, Self, final, overload
 
 from dmock._exceptions import ConfigurationError, ExceededCallError
 from dmock._matchers import (
-    Matcher,
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
     _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )
@@ -27,13 +26,6 @@ if TYPE_CHECKING:
     from typing import Any
 
     from dmock._types import Outcome, Quantifier
-
-
-def _value_matches(expected: object, actual: object) -> bool:
-    if isinstance(expected, Matcher):
-        return expected.matches(actual)
-
-    return expected == actual
 
 
 @final
@@ -467,10 +459,7 @@ class Expectation(Generic[P, R]):
             if len(args) != len(self._expected_args):
                 return False
 
-            if not all(
-                _value_matches(e, a)
-                for e, a in zip(self._expected_args, args, strict=True)
-            ):
+            if not all(e == a for e, a in zip(self._expected_args, args, strict=True)):
                 return False
 
         if not self._has_any_kwargs:
@@ -478,8 +467,7 @@ class Expectation(Generic[P, R]):
                 return False
 
             if not all(
-                _value_matches(self._expected_kwargs[k], kwargs[k])
-                for k in self._expected_kwargs
+                self._expected_kwargs[k] == kwargs[k] for k in self._expected_kwargs
             ):
                 return False
 

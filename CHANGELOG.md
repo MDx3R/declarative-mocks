@@ -4,7 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-- `CollectionEquals` matches the same sequence, set, or mapping kind. Order matters for sequences only.
+- `CollectionOf` matches the same sequence, set, or mapping kind. Order matters for sequences only. `SequenceOf`, `SetOf`, and `MappingOf` match one kind.
+- `InstanceOf` matches an instance of a type. `exact=True` requires that exact type. `AnythingOfType` is now an alias.
 
 ## [0.4.0] - 2026-10-23
 
