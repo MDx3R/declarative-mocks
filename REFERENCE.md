@@ -117,6 +117,7 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `In(container)`                     | Value is a member of `container`                                     |
 | `Contains(item)`                    | Container holds `item`                                               |
 | `Includes(*items)`                  | Container holds every item                                           |
+| `CollectionEquals(expected)`        | Same sequence, set, or mapping kind.                                 |
 | `Attr(name)`                        | Object has attribute `name`                                          |
 | `Range(left, right)`                | Value is strictly inside the interval                                |
 | `LessThan` / `GreaterThan`          | Strict ordering                                                      |

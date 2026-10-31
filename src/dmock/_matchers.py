@@ -3,9 +3,9 @@ from __future__ import annotations
 import math
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Container, Sized
+from collections.abc import Collection, Container, Mapping, Sequence, Set, Sized
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol, SupportsFloat, TypeAlias
+from typing import TYPE_CHECKING, Protocol, SupportsFloat, TypeAlias, cast
 
 
 if TYPE_CHECKING:
@@ -720,6 +720,92 @@ class Includes(Matcher):
 
     def __repr__(self) -> str:
         return f"Includes({', '.join(map(repr, self._items))})"
+
+
+class CollectionEquals(Matcher):
+    """Matches a sequence, set, or mapping of the same kind as `expected`.
+
+    Order matters for sequences. Sets and mappings ignore order. A different
+    kind does not match. Values of the same kind match when their elements
+    are equal, including when the concrete types differ.
+
+    ``str``, ``bytes``, ``bytearray``, ``memoryview``, and
+    :class:`collections.UserString` are sequences and are valid `expected`
+    values. They match any sequence of the same elements in the same order.
+    A ``str`` or :class:`collections.UserString` yields characters. ``bytes``,
+    ``bytearray``, and a ``memoryview`` of a bytes buffer yield integers, so
+    they match each other and a list of those integers.
+
+    Args:
+        expected: Sequence, set, or mapping to compare against.
+
+    Examples:
+        >>> from dmock import DeclarativeMock
+        >>> from dmock import CollectionEquals
+        >>> (1, 2, 3) == CollectionEquals([1, 2, 3])
+        True
+        >>> (1, 2, 3) == CollectionEquals({1, 2, 3})
+        False
+        >>> "ab" == CollectionEquals(["a", "b"])
+        True
+        >>> ["a", "b"] == CollectionEquals("ab")
+        True
+        >>> b"ab" == CollectionEquals(bytearray(b"ab"))
+        True
+        >>> [97, 98] == CollectionEquals(b"ab")
+        True
+        >>> bytearray(b"ab") == CollectionEquals(memoryview(b"ab"))
+        True
+        >>> from collections import UserString
+        >>> UserString("ab") == CollectionEquals("ab")
+        True
+        >>> "ab" == CollectionEquals(UserString("ab"))
+        True
+        >>> "ab" == CollectionEquals(b"ab")
+        False
+        >>> class Service:
+        ...     def fetch(self, items: tuple[int, ...]) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", CollectionEquals([1, 2, 3])).returns("ok")
+        Expectation(fetch(CollectionEquals([1, 2, 3])))
+        >>> mock.fetch((1, 2, 3))
+        'ok'
+    """
+
+    def __init__(self, expected: Collection[object], /) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:  # noqa: PLR0911
+        """Return whether `value` has the same kind and the same contents."""
+        if not isinstance(value, Collection):
+            return False
+
+        value = cast("Collection[object]", value)
+        if len(value) != len(self._expected):
+            return False
+
+        if type(value) is type(self._expected):
+            return value == self._expected
+
+        if isinstance(value, Sequence) and isinstance(self._expected, Sequence):
+            return all(v == e for v, e in zip(value, self._expected, strict=True))
+
+        if isinstance(value, Set) and isinstance(self._expected, Set):
+            return all(v in self._expected for v in value)
+
+        if isinstance(value, Mapping) and isinstance(self._expected, Mapping):
+            value, self._expected = (
+                cast("Mapping[object, object]", value),
+                cast("Mapping[object, object]", self._expected),
+            )
+            return all(
+                k in self._expected and value[k] == self._expected[k] for k in value
+            )
+
+        return False
+
+    def __repr__(self) -> str:
+        return f"CollectionEquals({self._expected!r})"
 
 
 class Attr(Matcher):

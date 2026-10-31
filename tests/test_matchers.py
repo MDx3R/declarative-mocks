@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections import UserDict, UserString
+from collections.abc import Collection
 from datetime import UTC, datetime
+from types import MappingProxyType
 
 import pytest
 
@@ -21,6 +24,7 @@ from dmock import (
     Approx,
     Args,
     Attr,
+    CollectionEquals,
     Contains,
     Empty,
     EndsWith,
@@ -337,6 +341,90 @@ class TestIncludes:
 
     def test_repr(self) -> None:
         assert repr(Includes("a", "b")) == "Includes('a', 'b')"
+
+
+class TestCollectionEquals:
+    @pytest.mark.parametrize(
+        ("value", "expected", "matched"),
+        list[tuple[object, Collection[object], bool]](
+            [
+                ((1, 2, 3), [1, 2, 3], True),
+                ([1, 2, 3], (1, 2, 3), True),
+                ([1, 2], [1, 2], True),
+                ([1, 2], [2, 1], False),
+                ((1, 2), [2, 1], False),
+                ([1, 2], [1, 2, 3], False),
+                (range(3), [0, 1, 2], True),
+                ((1, 2, 3), {1, 2, 3}, False),
+                ([1, 2], {1, 2}, False),
+                ({1, 2}, {2, 1}, True),
+                ({1, 2}, frozenset({2, 1}), True),
+                (frozenset({1}), {1}, True),
+                ({1, 2}, frozenset({1, 3}), False),
+                ({"b": 1, "a": 2}, {"a": 2, "b": 1}, True),
+                ({"a": 1}, {"a": 2}, False),
+                ({"a": 1, "b": 2}, {"a": 1}, False),
+                (UserDict({"a": 1}), {"a": 1}, True),
+                (MappingProxyType({"b": 1, "a": 2}), {"a": 2, "b": 1}, True),
+                ({"a": 1}, [("a", 1)], False),
+                ({1: "a", 2: "b"}.keys(), {1, 2}, True),
+                ({1: "a"}.items(), {(1, "a")}, True),
+                ({1: "a"}.values(), ["a"], False),
+                ("ab", ["a", "b"], True),
+                (["a", "b"], "ab", True),
+                ("ab", ("a", "b"), True),
+                ("ab", "ab", True),
+                ("ab", ["b", "a"], False),
+                ("ab", ["a"], False),
+                ("", [], True),
+                ([], "", True),
+                ("", {}, False),
+                ("", set(), False),
+                ("ab", {"a", "b"}, False),
+                (b"ab", bytearray(b"ab"), True),
+                (bytearray(b"ab"), b"ab", True),
+                (b"ab", [97, 98], True),
+                ([97, 98], b"ab", True),
+                (bytearray(b"ab"), memoryview(b"ab"), True),
+                (memoryview(b"ab"), b"ab", True),
+                (memoryview(b"ab"), [97, 98], True),
+                (b"ab", memoryview(b"ab"), True),
+                (b"", [], True),
+                (b"ab", ["a", "b"], False),
+                ("ab", b"ab", False),
+                (b"ab", "ab", False),
+                (UserString("ab"), "ab", True),
+                ("ab", UserString("ab"), True),
+                (UserString("ab"), ["a", "b"], True),
+                (["a", "b"], UserString("ab"), True),
+                (UserString("ab"), UserString("ab"), True),
+                (1, [1], False),
+                (None, [], False),
+            ]
+        ),
+    )
+    def test_matches(
+        self,
+        value: object,
+        expected: Collection[object],
+        matched: bool,
+    ) -> None:
+        assert CollectionEquals(expected).matches(value) is matched
+
+    @pytest.mark.parametrize(
+        ("expected", "text"),
+        [
+            ([1, 2, 3], "CollectionEquals([1, 2, 3])"),
+            ("ab", "CollectionEquals('ab')"),
+            (b"ab", "CollectionEquals(b'ab')"),
+            ({1, 2}, "CollectionEquals({1, 2})"),
+        ],
+    )
+    def test_repr(self, expected: Collection[object], text: str) -> None:
+        assert repr(CollectionEquals(expected)) == text
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(CollectionEquals([]), Matcher)
 
 
 class TestAttr:

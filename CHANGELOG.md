@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+- `CollectionEquals` matches the same sequence, set, or mapping kind. Order matters for sequences only.
+
 ## [0.4.0] - 2026-10-23
 
 - pytest calls `verify()` when a test finishes. An unmet expectation fails that test. An exception the test already raised is kept. Mocks created while fixtures finalize are checked after teardown and do not leak into the next test.
