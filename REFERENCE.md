@@ -126,7 +126,7 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `PartialMapping(expected)`                  | Mapping contains the given pairs.                                    |
 | `Namespace(**expected)`                     | Slots and instance attributes are exactly these.                     |
 | `PartialNamespace(**expected)`              | Slots and instance attributes contain these. Extra ones are ignored. |
-| `Attr(name)`                                | Object has attribute `name`                                          |
+| `Attr(*names)`                              | Object has every named attribute                                     |
 | `Range(left, right)`                        | Value is strictly inside the interval                                |
 | `LessThan` / `GreaterThan`                  | Strict ordering                                                      |
 | `LessEquals` / `GreaterEquals`              | Inclusive ordering                                                   |

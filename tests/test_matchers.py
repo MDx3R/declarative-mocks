@@ -1263,11 +1263,23 @@ class TestAttr:
 
         assert Attr("name").matches(Item()) is True
 
-    def test_rejects_missing_attribute(self) -> None:
+    def test_matches_every_attribute(self) -> None:
+        class Item:
+            name = "n"
+            kind = "book"
+
+        assert Attr("name", "kind").matches(Item()) is True
+
+    def test_rejects_when_any_attribute_is_missing(self) -> None:
+        class Item:
+            name = "n"
+
         assert Attr("name").matches(object()) is False
+        assert Attr("name", "kind").matches(Item()) is False
 
     def test_repr(self) -> None:
         assert repr(Attr("name")) == "Attr('name')"
+        assert repr(Attr("name", "kind")) == "Attr('name', 'kind')"
 
     def test_satisfies_matcher_protocol(self) -> None:
         assert isinstance(Attr("name"), Matcher)

@@ -1242,8 +1242,7 @@ class Namespace(_InstanceAttributesMixin, Matcher):
         )
 
     def __repr__(self) -> str:
-        pairs = ", ".join(f"{name}={item!r}" for name, item in self._expected.items())
-        return f"Namespace({pairs})"
+        return f"Namespace({', '.join(f'{name}={item!r}' for name, item in self._expected.items())})"
 
 
 class PartialNamespace(_InstanceAttributesMixin, Matcher):
@@ -1285,39 +1284,41 @@ class PartialNamespace(_InstanceAttributesMixin, Matcher):
         )
 
     def __repr__(self) -> str:
-        pairs = ", ".join(f"{name}={item!r}" for name, item in self._expected.items())
-        return f"PartialNamespace({pairs})"
+        return f"PartialNamespace({', '.join(f'{name}={item!r}' for name, item in self._expected.items())})"
 
 
 class Attr(Matcher):
-    """Matches an object that has an attribute named `attr`.
+    """Matches an object that has every given attribute.
+
+    A missing attribute does not match.
 
     Args:
-        attr: Attribute name passed to ``hasattr``.
+        *attrs: Attribute names that must all be present.
 
     Examples:
         >>> from dmock import DeclarativeMock
         >>> from dmock import Attr
         >>> class Item:
         ...     name = "n"
+        ...     kind = "book"
         >>> class Service:
         ...     def fetch(self, item: Item) -> str: ...
         >>> mock = DeclarativeMock(Service)
-        >>> mock.expect("fetch", Attr("name")).returns("ok")
-        Expectation(fetch(Attr('name')))
+        >>> mock.expect("fetch", Attr("name", "kind")).returns("ok")
+        Expectation(fetch(Attr('name', 'kind')))
         >>> mock.fetch(Item())
         'ok'
     """
 
-    def __init__(self, attr: str, /) -> None:
-        self._attr = attr
+    def __init__(self, /, *attrs: str) -> None:
+        self._attrs = attrs
 
     def matches(self, value: object, /) -> bool:
-        """Return whether `value` has attribute `attr`."""
-        return hasattr(value, self._attr)
+        """Return whether `value` has every attribute."""
+        return all(hasattr(value, attr) for attr in self._attrs)
 
     def __repr__(self) -> str:
-        return f"Attr({self._attr!r})"
+        return f"Attr({', '.join(map(repr, self._attrs))})"
 
 
 if TYPE_CHECKING:
