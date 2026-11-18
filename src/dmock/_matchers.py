@@ -4,7 +4,15 @@ import dataclasses
 import math
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Container, Mapping, Sequence, Set, Sized
+from collections.abc import (
+    Collection,
+    Container,
+    Iterable,
+    Mapping,
+    Sequence,
+    Set,
+    Sized,
+)
 from datetime import datetime, timedelta
 from typing import (
     TYPE_CHECKING,
@@ -1119,6 +1127,166 @@ class PartialMapping(Matcher):
 
     def __repr__(self) -> str:
         return f"PartialMapping({self._expected!r})"
+
+
+class _InstanceAttributesMixin:
+    """Shared lookup of slots and attributes stored on an instance."""
+
+    def _instance_attributes(self, value: object) -> Mapping[object, object]:
+        """Return assigned slots and instance attributes.
+
+        An uninitialized slot is omitted. An object with no assigned instance
+        attributes returns an empty mapping. A slot hides a same-named entry in
+        the instance dictionary.
+        """
+        names: set[object] = set()
+        for cls in type(value).__mro__:
+            names.update(self._slot_names(cls))
+
+        namespace = self._namespace(value)
+        names.update(namespace)
+
+        if namespace and not names:
+            return {}
+
+        missing = object()
+        attributes: dict[object, object] = {}
+        for name in names:
+            if not isinstance(name, str):
+                if namespace:
+                    attributes[name] = namespace[name]
+
+                continue
+
+            actual = getattr(value, name, missing)
+            if actual is missing:
+                continue
+
+            attributes[name] = actual
+
+        return attributes
+
+    def _slot_names(self, class_: type[object]) -> Iterable[str]:
+        """Yield slot names declared on `class_`, skipping dictionary and weakref slots."""
+        slots = getattr(class_, "__slots__", ())
+        if isinstance(slots, str):
+            return (slots,)
+
+        if not isinstance(slots, Iterable):
+            return ()
+
+        return (
+            slot
+            for slot in cast("Iterable[object]", slots)
+            if isinstance(slot, str) and slot not in {"__dict__", "__weakref__"}
+        )
+
+    def _namespace(self, value: object) -> Mapping[object, object]:
+        """Return the instance dictionary, or an empty mapping when there is none."""
+        namespace = getattr(value, "__dict__", None)
+        if not isinstance(namespace, Mapping):
+            return {}
+
+        return cast("Mapping[object, object]", namespace)
+
+
+class Namespace(_InstanceAttributesMixin, Matcher):
+    """Matches an object whose instance attributes are exactly the given pairs.
+
+    Attribute order is ignored. A missing or extra attribute does not match.
+    Slots and attributes stored on the instance match. Class attributes and
+    properties do not. An object with no instance attributes, including
+    ``int``, ``None``, and ``object``, matches an empty :class:`Namespace`.
+    A value that is a :class:`Matcher` is applied to the attribute. Other
+    values use ``==``.
+
+    Args:
+        **expected: Instance attributes the object must have, and no others.
+
+    Examples:
+        >>> from types import SimpleNamespace
+        >>> from dmock import DeclarativeMock, GreaterThan, Namespace
+        >>> SimpleNamespace(name="n", qty=2) == Namespace(name="n", qty=GreaterThan(0))
+        True
+        >>> SimpleNamespace(name="n", qty=2) == Namespace(name="n")
+        False
+        >>> object() == Namespace()
+        True
+        >>> class Item:
+        ...     __slots__ = ("name",)
+        ...
+        ...     def __init__(self) -> None:
+        ...         self.name = "n"
+        >>> Item() == Namespace(name="n")
+        True
+        >>> class Service:
+        ...     def fetch(self, item: SimpleNamespace) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", Namespace(name="n")).returns("ok")
+        Expectation(fetch(Namespace(name='n')))
+        >>> mock.fetch(SimpleNamespace(name="n"))
+        'ok'
+    """
+
+    def __init__(self, /, **expected: object) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether the instance attributes are exactly the expected pairs."""
+        attributes = self._instance_attributes(value)
+        if attributes.keys() != self._expected.keys():
+            return False
+
+        return all(
+            expected == attributes[name] for name, expected in self._expected.items()
+        )
+
+    def __repr__(self) -> str:
+        pairs = ", ".join(f"{name}={item!r}" for name, item in self._expected.items())
+        return f"Namespace({pairs})"
+
+
+class PartialNamespace(_InstanceAttributesMixin, Matcher):
+    """Matches an object that has every given instance attribute.
+
+    Extra attributes are ignored. Slots and attributes stored on the instance
+    match. Class attributes and properties do not. A missing attribute does
+    not match. A value that is a :class:`Matcher` is applied to the attribute.
+    Other values use ``==``.
+
+    Args:
+        **expected: Attributes the object must have.
+
+    Examples:
+        >>> from types import SimpleNamespace
+        >>> from dmock import DeclarativeMock, GreaterThan, PartialNamespace
+        >>> SimpleNamespace(name="n", qty=2) == PartialNamespace(qty=GreaterThan(0))
+        True
+        >>> SimpleNamespace(name="n") == PartialNamespace(qty=1)
+        False
+        >>> class Service:
+        ...     def fetch(self, item: SimpleNamespace) -> str: ...
+        >>> mock = DeclarativeMock(Service)
+        >>> mock.expect("fetch", PartialNamespace(name="n")).returns("ok")
+        Expectation(fetch(PartialNamespace(name='n')))
+        >>> mock.fetch(SimpleNamespace(name="n", qty=2))
+        'ok'
+    """
+
+    def __init__(self, /, **expected: object) -> None:
+        self._expected = expected
+
+    def matches(self, value: object, /) -> bool:
+        """Return whether every expected instance attribute is present and equal."""
+        attributes = self._instance_attributes(value)
+        return all(
+            name in attributes and expected == attributes[name]
+            for name, expected in self._expected.items()
+        )
+
+    def __repr__(self) -> str:
+        pairs = ", ".join(f"{name}={item!r}" for name, item in self._expected.items())
+        return f"PartialNamespace({pairs})"
 
 
 class Attr(Matcher):
