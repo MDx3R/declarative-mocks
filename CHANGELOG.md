@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+- `Attr` accepts several attribute names and matches only when the object has every one.
+- `Namespace` matches an object whose slots and instance attributes are exactly the given attributes. Class attributes and properties do not count.
+- `PartialNamespace` matches an object that has the given slots and instance attributes. Class attributes and properties do not count. Extra attributes are ignored.
+
 ## [0.4.2] - 2026-10-31
 
 - Fix the README quantifier example. `.returns()` takes `repeat`. `.times(n)` is the quantifier.

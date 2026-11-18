@@ -124,7 +124,9 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `MappingOf(expected)`                       | Same mapping pairs                                                   |
 | `AnyOrder(items)`                           | Same items in any order, each paired with a distinct element         |
 | `PartialMapping(expected)`                  | Mapping contains the given pairs.                                    |
-| `Attr(name)`                                | Object has attribute `name`                                          |
+| `Namespace(**expected)`                     | Slots and instance attributes are exactly these.                     |
+| `PartialNamespace(**expected)`              | Slots and instance attributes contain these. Extra ones are ignored. |
+| `Attr(*names)`                              | Object has every named attribute                                     |
 | `Range(left, right)`                        | Value is strictly inside the interval                                |
 | `LessThan` / `GreaterThan`                  | Strict ordering                                                      |
 | `LessEquals` / `GreaterEquals`              | Inclusive ordering                                                   |

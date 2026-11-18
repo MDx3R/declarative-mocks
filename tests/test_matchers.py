@@ -6,7 +6,7 @@ import re
 from collections import UserDict, UserString
 from dataclasses import dataclass, make_dataclass
 from datetime import UTC, datetime, timedelta
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 from typing import TYPE_CHECKING, NamedTuple
 from uuid import UUID
 
@@ -50,11 +50,13 @@ from dmock import (
     MatchedBy,
     Matcher,
     Maybe,
+    Namespace,
     Never,
     Not,
     Nothing,
     Or,
     PartialMapping,
+    PartialNamespace,
     Range,
     Regex,
     RegexFullmatch,
@@ -972,6 +974,288 @@ class TestPartialMapping:
         assert isinstance(PartialMapping({}), Matcher)
 
 
+class TestNamespace:
+    @pytest.mark.parametrize(
+        ("value", "matched"),
+        [
+            pytest.param(SimpleNamespace(name="n", qty=2), True, id="exact"),
+            pytest.param(SimpleNamespace(qty=2, name="n"), True, id="different-order"),
+            pytest.param(SimpleNamespace(name="n", qty=2, extra=1), False, id="extra"),
+            pytest.param(SimpleNamespace(name="n"), False, id="missing"),
+            pytest.param(SimpleNamespace(name="x", qty=2), False, id="wrong-value"),
+            pytest.param(SimpleNamespace(), False, id="empty"),
+            pytest.param(object(), False, id="object"),
+            pytest.param(1, False, id="int"),
+            pytest.param(None, False, id="none"),
+        ],
+    )
+    def test_matches(self, value: object, matched: bool) -> None:
+        assert Namespace(name="n", qty=2).matches(value) is matched
+
+    def test_matches_a_plain_instance(self) -> None:
+        class Item:
+            def __init__(self) -> None:
+                self.name = "n"
+                self.qty = 2
+
+        assert Namespace(name="n", qty=2).matches(Item()) is True
+
+    def test_empty_matches_an_instance_with_no_attributes(self) -> None:
+        class Item:
+            pass
+
+        assert Namespace().matches(Item()) is True
+        assert Namespace().matches(SimpleNamespace(name="n")) is False
+        assert Namespace().matches(object()) is True
+        assert Namespace().matches(1) is True
+        assert Namespace().matches(None) is True
+        assert Namespace(name="n").matches(object()) is False
+
+    def test_ignores_class_attributes(self) -> None:
+        class Item:
+            kind = "book"
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert Namespace(name="n").matches(Item()) is True
+        assert Namespace(name="n", kind="book").matches(Item()) is False
+
+    def test_matches_slotted_attributes(self) -> None:
+        class Item:
+            __slots__ = ("name",)
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert Namespace(name="n").matches(Item()) is True
+        assert Namespace(name="x").matches(Item()) is False
+        assert Namespace().matches(Item()) is False
+
+    def test_matches_a_string_slot(self) -> None:
+        class Item:
+            __slots__ = "name"  # noqa: PLC0205
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert Namespace(name="n").matches(Item()) is True
+
+    def test_matches_a_slot_and_instance_attributes(self) -> None:
+        class Item:
+            __slots__ = ("__dict__", "name")
+
+            def __init__(self) -> None:
+                self.name = "n"
+                self.extra = 1
+
+        assert Namespace(name="n", extra=1).matches(Item()) is True
+        assert Namespace(name="n").matches(Item()) is False
+        assert Namespace(extra=1).matches(Item()) is False
+
+    def test_matches_inherited_slots(self) -> None:
+        class Base:
+            __slots__ = ("name",)
+
+        class Child(Base):
+            __slots__ = ("qty",)
+
+            def __init__(self) -> None:
+                self.name = "n"
+                self.qty = 2
+
+        assert Namespace(name="n", qty=2).matches(Child()) is True
+        assert Namespace(name="n").matches(Child()) is False
+
+    def test_ignores_an_uninitialized_slot(self) -> None:
+        class Item:
+            __slots__ = ("name", "qty")
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert Namespace(name="n").matches(Item()) is True
+        assert Namespace(name="n", qty=1).matches(Item()) is False
+
+    def test_matches_when_every_slot_is_uninitialized(self) -> None:
+        class Item:
+            __slots__ = ("name",)
+
+        assert Namespace().matches(Item()) is True
+        assert Namespace(name="n").matches(Item()) is False
+
+    def test_prefers_a_slot_over_a_dict_entry(self) -> None:
+        class Base:
+            __slots__ = ("name",)
+            name: str
+
+        class Child(Base):
+            pass
+
+        item = Child()
+        item.name = "slot"
+        item.__dict__["name"] = "dict"
+
+        assert item.name == "slot"
+        assert Namespace(name="slot").matches(item) is True
+        assert Namespace(name="dict").matches(item) is False
+
+    def test_empty_matches_an_object_without_instance_attributes(self) -> None:
+        class Item:
+            __slots__ = ()
+
+        class Point(NamedTuple):
+            name: str
+
+        assert Namespace().matches(Item()) is True
+        assert Namespace(name="n").matches(Point("n")) is False
+        assert Namespace().matches(Point("n")) is True
+
+    def test_ignores_properties(self) -> None:
+        class Item:
+            def __init__(self) -> None:
+                self.name = "n"
+
+            @property
+            def kind(self) -> str:
+                return "book"
+
+        assert Namespace(name="n").matches(Item()) is True
+        assert Namespace(name="n", kind="book").matches(Item()) is False
+
+    def test_rejects_a_non_mapping_dict(self) -> None:
+        class Item:
+            def __getattribute__(self, name: str, /) -> object:
+                if name == "__dict__":
+                    return "no"
+                return object.__getattribute__(self, name)
+
+        assert Namespace(name="n").matches(Item()) is False
+
+    def test_applies_a_matcher_value(self) -> None:
+        class Qty:
+            def __init__(self, value: int) -> None:
+                self.value = value
+
+            def __eq__(self, other: object) -> bool:
+                return isinstance(other, Qty) and self.value == other.value
+
+            def __hash__(self) -> int:
+                return hash(self.value)
+
+        class Item:
+            def __init__(self) -> None:
+                self.qty = Qty(2)
+
+        assert Namespace(qty=Anything()).matches(Item()) is True
+        assert Namespace(qty=GreaterThan(0)).matches(SimpleNamespace(qty=2)) is True
+        assert Namespace(qty=GreaterThan(0)).matches(SimpleNamespace(qty=0)) is False
+
+    def test_nested_namespace(self) -> None:
+        value = SimpleNamespace(user=SimpleNamespace(name="a", age=1))
+        assert Namespace(user=PartialNamespace(name="a")).matches(value) is True
+
+    def test_equality_uses_matches(self) -> None:
+        value = SimpleNamespace(name="n", qty=2)
+        assert value == Namespace(name="n", qty=2)
+        assert Namespace(name="n") != value
+
+    def test_repr(self) -> None:
+        assert repr(Namespace(name="n", qty=2)) == "Namespace(name='n', qty=2)"
+        assert repr(Namespace()) == "Namespace()"
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(Namespace(), Matcher)
+
+
+class TestPartialNamespace:
+    @pytest.mark.parametrize(
+        ("value", "matched"),
+        [
+            pytest.param(SimpleNamespace(name="n", qty=2), True, id="extra"),
+            pytest.param(SimpleNamespace(name="n"), True, id="exact"),
+            pytest.param(SimpleNamespace(qty=1, name="n"), True, id="different-order"),
+            pytest.param(SimpleNamespace(name="x"), False, id="wrong-value"),
+            pytest.param(SimpleNamespace(), False, id="missing"),
+            pytest.param(SimpleNamespace(qty=2), False, id="wrong-key"),
+            pytest.param(object(), False, id="object"),
+            pytest.param(1, False, id="int"),
+            pytest.param(None, False, id="none"),
+        ],
+    )
+    def test_matches(self, value: object, matched: bool) -> None:
+        assert PartialNamespace(name="n").matches(value) is matched
+
+    def test_empty_matches_any_object(self) -> None:
+        assert PartialNamespace().matches(SimpleNamespace(name="n")) is True
+        assert PartialNamespace().matches(object()) is True
+        assert PartialNamespace().matches(1) is True
+
+    def test_ignores_class_attributes(self) -> None:
+        class Item:
+            kind = "book"
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert PartialNamespace(name="n").matches(Item()) is True
+        assert PartialNamespace(kind="book").matches(Item()) is False
+
+    def test_matches_slotted_attributes(self) -> None:
+        class Item:
+            __slots__ = ("name",)
+
+            def __init__(self) -> None:
+                self.name = "n"
+
+        assert PartialNamespace(name="n").matches(Item()) is True
+        assert PartialNamespace(name="x").matches(Item()) is False
+
+    def test_matches_a_slot_and_instance_attributes(self) -> None:
+        class Item:
+            __slots__ = ("__dict__", "name")
+
+            def __init__(self) -> None:
+                self.name = "n"
+                self.extra = 1
+
+        assert PartialNamespace(name="n", extra=1).matches(Item()) is True
+        assert PartialNamespace(name="x").matches(Item()) is False
+
+    def test_ignores_a_property(self) -> None:
+        class Item:
+            @property
+            def name(self) -> str:
+                return "n"
+
+        assert PartialNamespace(name="n").matches(Item()) is False
+
+    def test_missing_attribute_does_not_satisfy_a_matcher(self) -> None:
+        assert PartialNamespace(name=Anything()).matches(object()) is False
+
+    def test_applies_a_matcher_value(self) -> None:
+        present = SimpleNamespace(name="n", qty=2)
+        absent = SimpleNamespace(qty=0)
+        assert PartialNamespace(qty=GreaterThan(0)).matches(present) is True
+        assert PartialNamespace(qty=GreaterThan(0)).matches(absent) is False
+
+    def test_nested_partial_namespace(self) -> None:
+        value = SimpleNamespace(user=SimpleNamespace(name="a", age=1))
+        assert PartialNamespace(user=PartialNamespace(name="a")).matches(value) is True
+
+    def test_equality_uses_matches(self) -> None:
+        value = SimpleNamespace(name="n", qty=2)
+        assert value == PartialNamespace(name="n")
+        assert PartialNamespace(qty=1) != value
+
+    def test_repr(self) -> None:
+        assert repr(PartialNamespace(name="n")) == "PartialNamespace(name='n')"
+        assert repr(PartialNamespace()) == "PartialNamespace()"
+
+    def test_satisfies_matcher_protocol(self) -> None:
+        assert isinstance(PartialNamespace(), Matcher)
+
+
 class TestAttr:
     def test_matches_existing_attribute(self) -> None:
         class Item:
@@ -979,11 +1263,23 @@ class TestAttr:
 
         assert Attr("name").matches(Item()) is True
 
-    def test_rejects_missing_attribute(self) -> None:
+    def test_matches_every_attribute(self) -> None:
+        class Item:
+            name = "n"
+            kind = "book"
+
+        assert Attr("name", "kind").matches(Item()) is True
+
+    def test_rejects_when_any_attribute_is_missing(self) -> None:
+        class Item:
+            name = "n"
+
         assert Attr("name").matches(object()) is False
+        assert Attr("name", "kind").matches(Item()) is False
 
     def test_repr(self) -> None:
         assert repr(Attr("name")) == "Attr('name')"
+        assert repr(Attr("name", "kind")) == "Attr('name', 'kind')"
 
     def test_satisfies_matcher_protocol(self) -> None:
         assert isinstance(Attr("name"), Matcher)
