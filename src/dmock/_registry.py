@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from dmock._mock import DeclarativeMock
+    from dmock._spy import DeclarativeSpy
 
 
 class MockRegistry:
@@ -64,3 +65,41 @@ class MockRegistry:
 
         for mock in mocks:
             mock.verify()
+
+
+class SpyRegistry:
+    _spies: ClassVar[list[DeclarativeSpy[Any]]] = []
+
+    @property
+    def spies(self) -> Sequence[DeclarativeSpy[Any]]:
+        """Return a copy of the spies registered right now.
+
+        Read it from any instance (``SpyRegistry().spies``). The copy is a
+        new list, so a later :meth:`add`, :meth:`clear`, or :meth:`teardown`
+        does not change it.
+        """
+        return list(self._spies)
+
+    @classmethod
+    def add(cls, spy: DeclarativeSpy[Any]) -> None:
+        """Remember `spy` until the next :meth:`teardown`."""
+        cls._spies.append(spy)
+
+    @classmethod
+    def clear(cls) -> None:
+        """Drop every registered spy without calling ``verify``."""
+        cls._spies = []
+
+    @classmethod
+    def teardown(cls) -> None:
+        """Verify every registered spy and forget them.
+
+        Raises:
+            UnsatisfiedExpectationError: A registered spy is unmet.
+                Remaining spies in this batch are not verified.
+        """
+        spies = list(cls._spies)
+        cls._spies = []
+
+        for spy in spies:
+            spy.verify()

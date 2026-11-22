@@ -35,6 +35,29 @@ class RunOutcome:
 
 
 @dataclass(frozen=True, slots=True)
+class ReturnCheck:
+    """Check `value` from a matching call."""
+
+    value: object
+    func: Callable[[], bool] | None
+
+
+@dataclass(frozen=True, slots=True)
+class RaiseCheck:
+    """Check raised `exception` from a matching call."""
+
+    exception: BaseException | type[BaseException]
+    func: Callable[[], bool] | None
+
+
+@dataclass(frozen=True, slots=True)
+class ConditionCheck:
+    """Call `func` from a matching call."""
+
+    func: Callable[[], bool]
+
+
+@dataclass(frozen=True, slots=True)
 class DefaultOutcome:
     """Returned by consume() when no explicit outcome was registered.
 
@@ -43,7 +66,15 @@ class DefaultOutcome:
     """
 
 
-Outcome = ReturnOutcome | RaiseOutcome | RunOutcome | DefaultOutcome
+Outcome = (
+    ReturnOutcome
+    | RaiseOutcome
+    | RunOutcome
+    | ReturnCheck
+    | RaiseCheck
+    | ConditionCheck
+    | DefaultOutcome
+)
 
 
 # -- Recorded calls --

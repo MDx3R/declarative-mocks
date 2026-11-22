@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeAlias, TypeVar
 if TYPE_CHECKING:
     from typing import Any
 
-
+B = TypeVar("B")
 T = TypeVar("T")
 P = ParamSpec("P")
 R = TypeVar("R")
+P2 = ParamSpec("P2")
+R2 = TypeVar("R2")
 T_co = TypeVar("T_co", covariant=True)
 
 

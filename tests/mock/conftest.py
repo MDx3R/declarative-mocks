@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dmock._registry import MockRegistry
+from dmock._registry import MockRegistry, SpyRegistry
 
 
 if TYPE_CHECKING:
@@ -24,4 +24,5 @@ def pytest_runtest_makereport(call: CallInfo[None]) -> Generator[None]:
     """
     if call.when == "call":
         MockRegistry.clear()
+        SpyRegistry.clear()
     yield

@@ -180,7 +180,7 @@ class Matcher(ABC, _Base):
         """
         return Not(self)
 
-    def __and__(self, other: object) -> object:
+    def __and__(self, other: object) -> Matcher:
         """Return a matcher that requires both sides to match.
 
         A non-matcher `other` is wrapped in :class:`Equals`. ``left & right``
@@ -204,7 +204,7 @@ class Matcher(ABC, _Base):
 
         return And(self, other)
 
-    def __rand__(self, other: object) -> object:
+    def __rand__(self, other: object) -> Matcher:
         """Return a matcher that requires both sides to match.
 
         Used when the left operand is not a :class:`Matcher`. A matcher on
@@ -229,7 +229,7 @@ class Matcher(ABC, _Base):
 
         return NotImplemented
 
-    def __or__(self, other: object) -> object:
+    def __or__(self, other: object) -> Matcher:
         """Return a matcher that requires either side to match.
 
         A non-matcher `other` is wrapped in :class:`Equals`. ``left | right``
@@ -253,7 +253,7 @@ class Matcher(ABC, _Base):
 
         return Or(self, other)
 
-    def __ror__(self, other: object) -> object:
+    def __ror__(self, other: object) -> Matcher:
         """Return a matcher that requires either side to match.
 
         Used when the left operand is not a :class:`Matcher`. A matcher on
@@ -1810,10 +1810,10 @@ class Args(Matcher):
     """
 
     def __init__(self, /, *args: object) -> None:
-        self.args = args
+        self._args = args
 
     def __repr__(self) -> str:
-        return "{}({})".format(type(self).__name__, ", ".join(map(repr, self.args)))
+        return "{}({})".format(type(self).__name__, ", ".join(map(repr, self._args)))
 
 
 class And(Args):
@@ -1840,7 +1840,7 @@ class And(Args):
 
     def matches(self, value: object, /) -> bool:
         """Return whether every argument matches `value`."""
-        return bool(all(a == value for a in self.args))
+        return bool(all(a == value for a in self._args))
 
 
 class Or(Args):
@@ -1867,4 +1867,4 @@ class Or(Args):
 
     def matches(self, value: object, /) -> bool:
         """Return whether any argument matches `value`."""
-        return bool(any(a == value for a in self.args))
+        return bool(any(a == value for a in self._args))

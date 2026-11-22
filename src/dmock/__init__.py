@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from dmock._check import Check, CheckAnd, CheckNot, CheckOr
 from dmock._exceptions import (
     ConfigurationError,
     DeclarativeMockError,
     UnexpectedCallError,
     UnsatisfiedExpectationError,
+    UnsatisfiedObservationError,
 )
-from dmock._expectation import Expectation, in_order
+from dmock._interaction import Expectation, in_order
 from dmock._matchers import (
     ANY_ARGS,
     ANY_KWARGS,
@@ -64,6 +66,7 @@ from dmock._matchers import (
     StartsWith,
 )
 from dmock._mock import DeclarativeMock, dmock
+from dmock._spy import DeclarativeSpy, dspy
 
 
 try:
@@ -89,11 +92,16 @@ __all__ = [
     "Approx",
     "Args",
     "Attr",
+    "Check",
+    "CheckAnd",
+    "CheckNot",
+    "CheckOr",
     "CollectionOf",
     "ConfigurationError",
     "Contains",
     "DeclarativeMock",
     "DeclarativeMockError",
+    "DeclarativeSpy",
     "Empty",
     "EndsWith",
     "Equals",
@@ -129,6 +137,8 @@ __all__ = [
     "StartsWith",
     "UnexpectedCallError",
     "UnsatisfiedExpectationError",
+    "UnsatisfiedObservationError",
     "dmock",
+    "dspy",
     "in_order",
 ]

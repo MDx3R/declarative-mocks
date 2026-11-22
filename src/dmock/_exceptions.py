@@ -7,7 +7,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import Any
 
-    from dmock._expectation import Expectation
+    from dmock._interaction import Expectation, Observation
+    from dmock._protocols import T
     from dmock._types import RecordedCall
 
 
@@ -16,16 +17,16 @@ class DeclarativeMockError(Exception):
 
 
 class UnexpectedCallError(DeclarativeMockError):
-    """A call matched no registered expectation.
+    """A call matched no registered interaction.
 
     Raised at dispatch time: missing ``expect``, argument mismatch, exhausted
-    expectation, out-of-order call, or ``never()``. Catch this type; the
+    interaction, out-of-order call, or ``never()``. Catch this type; the
     traceback may show a more specific subclass.
     """
 
 
 class UnregisteredCallError(UnexpectedCallError):
-    """Attribute has no registered expectation (whitelist miss)."""
+    """Attribute has no registered interaction (whitelist miss)."""
 
     def __init__(self, name: str, history: Sequence[RecordedCall]) -> None:
         self.name = name
@@ -34,18 +35,18 @@ class UnregisteredCallError(UnexpectedCallError):
 
     def __str__(self) -> str:
         return _with_history(
-            f"Unexpected call: {self.name!r} has no registered expectation.",
+            f"Unexpected call: {self.name!r} has no registered interaction.",
             self.history,
         )
 
 
 class NoMatchingCallError(UnexpectedCallError):
-    """Call matched no non-exhausted expectation for this name."""
+    """Call matched no non-exhausted interaction for this name."""
 
     def __init__(
         self,
         call: RecordedCall,
-        rejected: Sequence[Expectation[Any, Any]],
+        rejected: Sequence[Expectation[T, Any, Any] | Observation[T, Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.call = call
@@ -62,12 +63,12 @@ class NoMatchingCallError(UnexpectedCallError):
             f"  {exp!r} - {self._reason(exp)}" for exp in self.rejected
         )
         return _with_history(
-            f"{header} - no matching non-exhausted expectation.\n"
+            f"{header} - no matching non-exhausted interaction.\n"
             f"Candidates:\n{candidates}",
             self.history,
         )
 
-    def _reason(self, exp: Expectation[Any, Any]) -> str:
+    def _reason(self, exp: Expectation[T, Any, Any] | Observation[T, Any, Any]) -> str:
         if exp.is_exhausted():
             maximum = exp.quantifier.max_calls
             bound = "*" if maximum is None else str(maximum)
@@ -77,17 +78,17 @@ class NoMatchingCallError(UnexpectedCallError):
 
 
 class BlockedCallError(UnexpectedCallError):
-    """Call matched an expectation whose prerequisites are not yet satisfied."""
+    """Call matched an interaction whose prerequisites are not yet satisfied."""
 
     def __init__(
         self,
         call: RecordedCall,
-        expectation: Expectation[Any, Any],
-        blocked: Sequence[Expectation[Any, Any]],
+        interaction: Expectation[T, Any, Any] | Observation[T, Any, Any],
+        blocked: Sequence[Expectation[T, Any, Any] | Observation[T, Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.call = call
-        self.expectation = expectation
+        self.interaction = interaction
         self.blocked = tuple(blocked)
         self.history = tuple(history)
         super().__init__()
@@ -97,12 +98,14 @@ class BlockedCallError(UnexpectedCallError):
         return _with_history(
             f"Out-of-order call: {self.call.name!r} called with "
             f"args={self.call.args!r}, kwargs={self.call.kwargs!r}\n"
-            f"  {self.expectation!r} - {reasons}",
+            f"  {self.interaction!r} - {reasons}",
             self.history,
         )
 
     @staticmethod
-    def _blocked_reason(req: Expectation[Any, Any]) -> str:
+    def _blocked_reason(
+        req: Expectation[T, Any, Any] | Observation[T, Any, Any],
+    ) -> str:
         return (
             f"blocked by {req.method_name} "
             f"(expected {req.quantifier.description}, got {req.call_count})"
@@ -110,7 +113,7 @@ class BlockedCallError(UnexpectedCallError):
 
 
 class ExceededCallError(UnexpectedCallError):
-    """A matching call exceeded the expectation's quantifier upper bound."""
+    """A matching call exceeded the interaction's quantifier upper bound."""
 
     def __init__(self, method_name: str, calls: int, max_calls: int | None) -> None:
         self.method_name = method_name
@@ -131,7 +134,7 @@ class UnsatisfiedExpectationError(DeclarativeMockError):
 
     def __init__(
         self,
-        expectations: Sequence[Expectation[Any, Any]],
+        expectations: Sequence[Expectation[T, Any, Any]],
         history: Sequence[RecordedCall],
     ) -> None:
         self.expectations = tuple(expectations)
@@ -146,8 +149,28 @@ class UnsatisfiedExpectationError(DeclarativeMockError):
         return _with_history(f"Unsatisfied expectations:\n{lines}", self.history)
 
 
+class UnsatisfiedObservationError(DeclarativeMockError):
+    """Raised by :meth:`~dmock.DeclarativeSpy.verify` when a quantifier is unmet."""
+
+    def __init__(
+        self,
+        observations: Sequence[Observation[T, Any, Any]],
+        history: Sequence[RecordedCall],
+    ) -> None:
+        self.observations = tuple(observations)
+        self.history = tuple(history)
+        super().__init__()
+
+    def __str__(self) -> str:
+        lines = "\n".join(
+            f"  {obs!r} - expected {obs.quantifier.description}, got {obs.call_count}"
+            for obs in self.observations
+        )
+        return _with_history(f"Unsatisfied observations:\n{lines}", self.history)
+
+
 class ConfigurationError(DeclarativeMockError):
-    """Invalid expectation setup (conflicting quantifiers, reserved names, cycles)."""
+    """Invalid interaction setup (conflicting quantifiers, reserved names, cycles)."""
 
 
 def _with_history(message: str, history: Sequence[RecordedCall]) -> str:
