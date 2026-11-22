@@ -6,14 +6,14 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from dmock import (
+from dmock._interaction import in_order
+from dmock._matchers import (
     Anything,
     AnythingOfType,
-    DeclarativeMock,
     GreaterThan,
     Regex,
-    in_order,
 )
+from dmock._mock import DeclarativeMock
 
 
 pytest_plugins = ["pytester"]

@@ -208,7 +208,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., object]: ...
+    ) -> Expectation[T, ..., Any]: ...
 
     def expect(
         self,

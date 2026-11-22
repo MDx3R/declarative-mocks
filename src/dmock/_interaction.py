@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from collections import deque
 from typing import (
     TYPE_CHECKING,
-    Concatenate,
     Generic,
-    Self,
     final,
     overload,
 )
@@ -34,9 +32,9 @@ from dmock._types import (
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Coroutine, Sequence
-    from typing import Any
+    from typing import Any, Concatenate, Self
 
-    from dmock._protocols import P2, R2
+    from dmock._protocols import P2, R2, E
     from dmock._types import Outcome, Quantifier
 
 
@@ -145,7 +143,7 @@ class Expectation(ABC, Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., object]: ...
+    ) -> Expectation[T, ..., Any]: ...
 
     @abstractmethod
     def expect(
@@ -643,7 +641,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., object]: ...
+    ) -> Expectation[T, ..., Any]: ...
 
     @abstractmethod
     def observe(
@@ -659,7 +657,7 @@ class Observation(ABC, Generic[T, P, R]):
         self,
         value: R,
         *,
-        condition: Callable[[], bool] | None = None,
+        condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
         """Declare the return value for the next matching call.
@@ -688,12 +686,28 @@ class Observation(ABC, Generic[T, P, R]):
         """
         ...
 
+    @overload
+    def raises(
+        self,
+        exc: E,
+        *,
+        condition: Callable[[E], bool] | None = None,
+        repeat: int = 1,
+    ) -> Self: ...
+    @overload
+    def raises(
+        self,
+        exc: type[E],
+        *,
+        condition: Callable[[E], bool] | None = None,
+        repeat: int = 1,
+    ) -> Self: ...
     @abstractmethod
     def raises(
         self,
-        exc: BaseException | type[BaseException],
+        exc: E | type[E],
         *,
-        condition: Callable[[], bool] | None = None,
+        condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
         """Declare that the next matching call raises `exc`.
@@ -724,7 +738,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def condition(self, func: Callable[[], bool], *, repeat: int = 1) -> Self:
+    def condition(self, func: Callable[[Any], bool], *, repeat: int = 1) -> Self:
         """Call `func` with the actual arguments for the next matching call.
 
         The return value of `func` becomes the result of that call. Chaining
@@ -1306,7 +1320,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., object]: ...
+    ) -> Expectation[T, ..., Any]: ...
 
     def observe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
@@ -1321,7 +1335,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         self,
         value: R,
         *,
-        condition: Callable[[], bool] | None = None,
+        condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
         """Declare the return value for the next matching call.
@@ -1355,11 +1369,34 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         self._append_outcome(ReturnOutcome(value), repeat)
         return self
 
+    @overload
+    def raises(
+        self,
+        exc: E,
+        *,
+        condition: Callable[[E], bool] | None = None,
+        repeat: int = 1,
+    ) -> Self: ...
+    @overload
+    def raises(
+        self,
+        exc: type[E],
+        *,
+        condition: Callable[[E], bool] | None = None,
+        repeat: int = 1,
+    ) -> Self: ...
+    @overload
     def raises(
         self,
         exc: BaseException | type[BaseException],
         *,
-        condition: Callable[[], bool] | None = None,
+        repeat: int = 1,
+    ) -> Self: ...
+    def raises(
+        self,
+        exc: BaseException | type[BaseException],
+        *,
+        condition: Callable[[Any], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
         """Declare that the next matching call raises `exc`.
@@ -1438,7 +1475,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         self._append_outcome(RunOutcome(func), repeat)
         return self
 
-    def condition(self, func: Callable[[], bool], *, repeat: int = 1) -> Self:
+    def condition(self, func: Callable[[Any], bool], *, repeat: int = 1) -> Self:
         self._append_outcome(ConditionCheck(func), repeat)
         return self
 

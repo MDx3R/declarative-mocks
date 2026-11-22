@@ -8,25 +8,24 @@ from unittest.mock import MagicMock, Mock, NonCallableMagicMock
 
 import pytest
 
-from dmock import (
+from dmock._exceptions import (
+    BlockedCallError,
+    ConfigurationError,
+    NoMatchingCallError,
+    UnexpectedCallError,
+    UnregisteredCallError,
+    UnsatisfiedExpectationError,
+)
+from dmock._interaction import in_order
+from dmock._matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
     AnythingOfType,
-    ConfigurationError,
-    DeclarativeMock,
     LessThan,
     MatchedBy,
-    UnexpectedCallError,
-    UnsatisfiedExpectationError,
-    dmock,
-    in_order,
 )
-from dmock._exceptions import (
-    BlockedCallError,
-    NoMatchingCallError,
-    UnregisteredCallError,
-)
+from dmock._mock import DeclarativeMock, dmock
 
 
 # ---------------------------------------------------------------------------
@@ -78,9 +77,7 @@ class TestBasicDispatch:
     def test_returns_configured_value(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
-        mock.expect(MyService.process_order, 123).returns("ok").expect(
-            MyService.greet, "hello"
-        )
+        mock.expect(MyService.process_order, 123).returns("ok")
 
         # Act
         result = mock.process_order(123)

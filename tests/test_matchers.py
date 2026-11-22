@@ -12,7 +12,7 @@ from uuid import UUID
 
 import pytest
 
-from dmock import (
+from dmock._matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     AWARE_DATETIME,
@@ -63,8 +63,6 @@ from dmock import (
     SequenceOf,
     SetOf,
     StartsWith,
-)
-from dmock._matchers import (
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
     _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )

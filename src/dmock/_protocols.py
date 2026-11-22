@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeVar
 
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, TypeAlias
 
-B = TypeVar("B")
+E = TypeVar("E", bound=BaseException)
 T = TypeVar("T")
 P = ParamSpec("P")
 R = TypeVar("R")

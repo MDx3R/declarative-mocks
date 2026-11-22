@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from dmock import UnsatisfiedExpectationError
+from dmock._exceptions import UnsatisfiedExpectationError
 from dmock._mock import DeclarativeMock
 from dmock._registry import MockRegistry
 

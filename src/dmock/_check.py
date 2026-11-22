@@ -5,16 +5,17 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Any
 
-    Predicate = Callable[[], bool]
+    Predicate = Callable[[Any], bool]
 
 
 class Check:
     def __init__(self, /, *predicates: Predicate) -> None:
         self._predicates = predicates
 
-    def __call__(self) -> bool:
-        return all(p() for p in self._predicates)
+    def __call__(self, value: Any) -> bool:
+        return all(p(value) for p in self._predicates)
 
     def __invert__(self) -> Check:
         return CheckNot(self)
@@ -53,21 +54,21 @@ class CheckNot(Check):
     def __init__(self, /, *predicates: Predicate) -> None:
         self._predicates = predicates
 
-    def __call__(self) -> bool:
-        return not any(p() for p in self._predicates)
+    def __call__(self, value: Any) -> bool:
+        return not any(p(value) for p in self._predicates)
 
 
 class CheckAnd(Check):
     def __init__(self, /, *predicates: Predicate) -> None:
         self._predicates = predicates
 
-    def __call__(self) -> bool:
-        return all(p() for p in self._predicates)
+    def __call__(self, value: Any) -> bool:
+        return all(p(value) for p in self._predicates)
 
 
 class CheckOr(Check):
     def __init__(self, /, *predicates: Predicate) -> None:
         self._predicates = predicates
 
-    def __call__(self) -> bool:
-        return any(p() for p in self._predicates)
+    def __call__(self, value: Any) -> bool:
+        return any(p(value) for p in self._predicates)

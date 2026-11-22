@@ -1,4 +1,4 @@
-"""Integration tests for DeclarativeMock."""
+"""Integration tests for DeclarativeSpy."""
 
 from __future__ import annotations
 
@@ -90,10 +90,10 @@ class TestBasicDispatch:
 
         checked = False
 
-        def capture() -> bool:
+        def capture(value: str) -> bool:
             nonlocal checked
             checked = True
-            return svc.last_processed is not None
+            return svc.last_processed is not None and value == "ok"
 
         spy = DeclarativeSpy(svc)
         spy.observe("process_order", 123).returns("ok", condition=capture)
@@ -122,10 +122,10 @@ class TestBasicDispatch:
 
         checked = False
 
-        def capture() -> bool:
+        def capture(value: str) -> bool:
             nonlocal checked
             checked = True
-            return svc.last_processed is not None
+            return svc.last_processed is not None and value == "ok"
 
         spy = DeclarativeSpy(svc)
         spy.observe("aprocess_order", 123).returns("ok", condition=capture)
@@ -161,10 +161,10 @@ class TestBasicDispatch:
 
         checked = False
 
-        def capture() -> bool:
+        def capture(exc: BaseException) -> bool:
             nonlocal checked
             checked = True
-            return svc.failed
+            return svc.failed and isinstance(exc, ValueError)
 
         mock = DeclarativeSpy(svc)
         mock.observe("do_something").raises(ValueError, condition=capture)
@@ -181,10 +181,10 @@ class TestBasicDispatch:
 
         checked = False
 
-        def capture() -> bool:
+        def capture(value: Any) -> bool:
             nonlocal checked
             checked = True
-            return svc.last_processed is not None
+            return svc.last_processed is not None and value == "ok"
 
         spy = DeclarativeSpy(svc)
         spy.observe("process_order", 123).condition(capture)
@@ -202,10 +202,10 @@ class TestBasicDispatch:
 
         checked = False
 
-        def capture() -> bool:
+        def capture(value: Any) -> bool:
             nonlocal checked
             checked = True
-            return svc.last_processed is not None
+            return svc.last_processed is not None and value == "ok"
 
         spy = DeclarativeSpy(svc)
         spy.observe("aprocess_order", 123).condition(capture)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from dataclasses import dataclass
 from functools import wraps
-from typing import TYPE_CHECKING, Generic, Never, Self, final, overload
+from typing import TYPE_CHECKING, Generic, final, overload
 
 from dmock._exceptions import (
     BlockedCallError,
@@ -28,7 +28,7 @@ from dmock._types import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
-    from typing import Any, Concatenate
+    from typing import Any, Concatenate, Never, Self
 
     from dmock._interaction import Expectation, Observation
     from dmock._matchers import (
@@ -184,7 +184,7 @@ class DeclarativeSpy(Generic[T], _Base):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Observation[T, ..., object]: ...
+    ) -> Observation[T, ..., Any]: ...
 
     def observe(
         self,
@@ -256,6 +256,7 @@ class DeclarativeSpy(Generic[T], _Base):
 
             return dispatcher
 
+        # NOTE: should be unreachable as long as observe raises on a non-callable
         return attr
 
     # -- Internal dispatch --
@@ -298,7 +299,7 @@ class DeclarativeSpy(Generic[T], _Base):
         args: tuple[object, ...],
         kwargs: dict[str, object],
     ) -> None:
-        condition: Callable[[], bool]
+        condition: Callable[[object], bool]
         match outcome:
             case ReturnOutcome():
                 if not result == outcome.value:
@@ -349,7 +350,7 @@ class DeclarativeSpy(Generic[T], _Base):
                     f"Expected code to be unreachable, but got: {outcome}"
                 )
 
-        if condition():
+        if condition(result):
             return
 
         # TODO: add exception

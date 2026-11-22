@@ -8,6 +8,7 @@ from dmock._exceptions import ConfigurationError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Any
 
 
 # -- Outcomes --
@@ -39,7 +40,7 @@ class ReturnCheck:
     """Check `value` from a matching call."""
 
     value: object
-    func: Callable[[], bool] | None
+    func: Callable[[Any], bool] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,14 +48,14 @@ class RaiseCheck:
     """Check raised `exception` from a matching call."""
 
     exception: BaseException | type[BaseException]
-    func: Callable[[], bool] | None
+    func: Callable[[Any], bool] | None
 
 
 @dataclass(frozen=True, slots=True)
 class ConditionCheck:
     """Call `func` from a matching call."""
 
-    func: Callable[[], bool]
+    func: Callable[[Any], bool]
 
 
 @dataclass(frozen=True, slots=True)
