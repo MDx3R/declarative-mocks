@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from dmock._exceptions import ConfigurationError
+from dmock._exceptions import ConfigurationError, DeclarativeMockError
 from dmock._matchers import Anything
 from dmock._spy import DeclarativeSpy, dspy
 
@@ -269,6 +269,63 @@ class TestBasicDispatch:
         assert first == "ok"
         assert second == "fail"
         assert third == "fail"
+
+    async def test_condition_skipped_on_failed_returns_observation(self) -> None:
+        # Arrange
+        checked = False
+
+        def capture(value: Any) -> bool:
+            nonlocal checked
+            checked = True
+            return True
+
+        spy = DeclarativeSpy(MyService())
+        spy.observe("do_something").returns("ok", condition=capture)
+
+        # Act
+        with pytest.raises(DeclarativeMockError):
+            spy.do_something()
+
+        # Assert
+        assert checked is False
+
+    async def test_condition_skipped_on_failed_raises_observation(self) -> None:
+        # Arrange
+        checked = False
+
+        def capture(value: Any) -> bool:
+            nonlocal checked
+            checked = True
+            return True
+
+        spy = DeclarativeSpy(MyService())
+        spy.observe("process_order", 123).raises(ValueError, condition=capture)
+
+        # Act
+        with pytest.raises(DeclarativeMockError):
+            spy.process_order(123)
+
+        # Assert
+        assert checked is False
+
+    async def test_condition_runs_on_any_condition_observation(self) -> None:
+        # Arrange
+        checked = False
+
+        def capture(value: Any) -> bool:
+            nonlocal checked
+            checked = True
+            return True
+
+        spy = DeclarativeSpy(MyService())
+        spy.observe("do_something").condition(capture)
+
+        # Act
+        with pytest.raises(ValueError, match=r"boom"):
+            spy.do_something()
+
+        # Assert
+        assert checked is True
 
 
 # ---------------------------------------------------------------------------
