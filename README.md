@@ -1,6 +1,6 @@
 ![Checks](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml/badge.svg)
 ![PyPI](https://img.shields.io/pypi/v/declarative-mocks.svg)
-![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
 # declarative-mocks
@@ -52,7 +52,8 @@ assert name.startswith("a")
 Here's an example of how **dmock** improves your tests:
 
 ```python
-from dmock import DeclarativeMock, IsNow, StartsWith
+from dmock import DeclarativeMock
+from dmock.matchers import IsNow, StartsWith
 
 service = DeclarativeMock(Directory)
 service.expect(Directory.lookup, StartsWith("a")).returns(
@@ -84,6 +85,9 @@ api.expect(ApiClient.next_page).returns({"items": [1], "cursor": "a"})
 # or you could use the string form to produce a lenient expectation: any arguments, any outcome
 api.expect("next_page").returns({"items": [2], "cursor": None})
 # first call → first dict; second call → second dict
+# Same args → registration order; different args → matched by args.
+# Chain .expect(...) or use in_order(...) to enforce strict order across different calls:
+api.expect("next_page", limit=5).returns({"items": []}).once().expect("close").raises(TimeoutError)
 
 calc = DeclarativeMock(Calculator)
 calc.expect("price", 100).runs(lambda x: x - 1).returns(99)
@@ -94,7 +98,8 @@ assert calc.price(100) == 99  # from .returns(99)
 `expect(...)` with no further arguments matches a call with no arguments. A keyword matches only that keyword:
 
 ```python
-from dmock import Anything, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import Anything
 
 m = DeclarativeMock(Worker)
 m.expect("run")  # called with no arguments
@@ -105,7 +110,8 @@ m.expect("run", job_id=123).returns("queued")  # this is keyword only
 `ANY_ARGS` and `ANY_KWARGS` match any positional and keyword arguments, including none:
 
 ```python
-from dmock import ANY_ARGS, ANY_KWARGS, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import ANY_ARGS, ANY_KWARGS
 
 m = DeclarativeMock(Worker)
 m.expect("run", ANY_ARGS, ANY_KWARGS).returns(0)  # any positional and keyword args, including none
@@ -133,7 +139,8 @@ calc.verify()
 Async methods use the same DSL. `runs()` accepts a sync or an async function:
 
 ```python
-from dmock import Anything, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import Anything
 
 mock = DeclarativeMock(MyService)
 mock.expect(MyService.aprocess_order, Anything()).returns("ok")
@@ -155,9 +162,9 @@ The matcher set is rich enough that even the most complicated call stays as **on
 
 ```python
 from typing import Any
-from dmock import (
+from dmock import DeclarativeMock
+from dmock.matchers import (
     AnyOrder,
-    DeclarativeMock,
     Equals,
     GreaterThan,
     HasLen,
@@ -217,16 +224,58 @@ assert bus.publish(
 bus.verify()
 ```
 
-**dmock** is built on `unittest.mock`, has zero runtime dependencies, and doesn't patch anything. Unregistered calls fail immediately. Nothing on live modules or instances is rewritten.
+**dmock** also supports pass-through spies using the same declarative DSL:
+
+```python
+from dmock import DeclarativeSpy
+from dmock.checks import Check
+
+class Store:
+    def __init__(self) -> None:
+        self.items: dict[str, str] = {}
+        self.dirty = False
+
+    def save(self, key: str, value: str) -> bool:
+        self.items[key] = value
+        self.dirty = False
+        return True
+
+    def fetch(self, key: str) -> str:
+        return self.items[key]
+
+store = Store()
+spy = DeclarativeSpy(store)
+
+(
+    spy.observe(Store.save, "a", "A")
+    .returns(
+        True,
+        condition=Check[bool](
+            lambda _: store.items.get("a") == "A",
+            lambda _: not store.dirty,
+        ),
+    )
+    .once()
+    .observe(Store.fetch, "a")
+    .returns("A")
+    .once()
+)
+
+assert spy.save("a", "A") is True
+assert spy.fetch("a") == "A"
+spy.verify()
+```
+
+**dmock** is built on `unittest.mock`, has zero runtime dependencies, and doesn't patch anything. Unregistered mock calls fail immediately. Nothing on live modules or instances is rewritten.
 
 Look up the dmock source code and tests yourself, it's full of examples!
 
 ## Limitations & non-goals
 
-- **No signature binding at runtime.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature at runtime.
-- **No automatic** `verify()` **outside pytest.** The pytest plugin checks every mock when the test finishes. Other runners still need an explicit `verify()`.
-- **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Just construct a `DeclarativeMock` and pass it in.
-- **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
+- **No signature binding at runtime.** `expect("method", …)` and `observe("method", …)` check that `method` exists on the spec or object, not that the argument list matches the real signature at runtime.
+- **No automatic** `verify()` **outside pytest.** The pytest plugin checks every mock and spy when the test finishes. Other runners still need an explicit `verify()`.
+- **No global patching.** The library does not patch modules or instances. Construct a `DeclarativeMock` or wrap a live instance with `DeclarativeSpy` and pass it in.
+- **Not thread-safe.** Concurrent use of one mock or spy from multiple threads is out of scope.
 
 ## Roadmap
 

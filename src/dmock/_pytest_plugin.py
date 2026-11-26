@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from _pytest._code import ExceptionInfo
 
-from dmock._registry import MockRegistry
+from dmock._registry import MockRegistry, SpyRegistry
 
 
 if TYPE_CHECKING:
@@ -20,15 +20,15 @@ if TYPE_CHECKING:
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> Generator[None]:
-    """Verify mocks when the call finishes, and again after teardown.
+    """Verify mocks and spies when the call finishes, and again after teardown.
 
     On the call phase a failed ``verify`` becomes the test failure. On the
-    teardown phase every mock still registered — including ones created while
-    fixtures were finalizing — is verified and dropped, and a failed
+    teardown phase every mock and spy still registered — including ones created
+    while fixtures were finalizing — is verified and dropped, and a failed
     ``verify`` is recorded on that phase's report. An exception the phase
     already raised stays in place (``call.excinfo`` is replaced only when it
-    is empty). ``MockRegistry.teardown`` empties the registry before
-    ``verify``, so a failure cannot leak into the next test.
+    is empty). ``MockRegistry.teardown`` and ``SpyRegistry.teardown` empty
+    the registries before ``verify``, so a failure cannot leak into the next test.
 
     Args:
         item: Test item for which the hook is being called.
@@ -41,6 +41,7 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]) -> Generator[Non
     if call.when in {"call", "teardown"}:
         try:
             MockRegistry.teardown()
+            SpyRegistry.teardown()
         except BaseException:
             call.excinfo = call.excinfo or ExceptionInfo.from_current()
 

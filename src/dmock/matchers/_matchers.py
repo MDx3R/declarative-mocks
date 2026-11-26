@@ -39,7 +39,8 @@ class _AnyArgsSentinel:
     :meth:`~dmock.DeclarativeMock.expect`.
 
     Examples:
-        >>> from dmock import ANY_ARGS, ANY_KWARGS, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import ANY_ARGS, ANY_KWARGS
         >>> class Service:
         ...     def fetch(self, *args: object, **kwargs: object) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -60,7 +61,8 @@ class _AnyKwargsSentinel:
     :meth:`~dmock.DeclarativeMock.expect` (it is a sentinel, not a keyword).
 
     Examples:
-        >>> from dmock import ANY_KWARGS, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import ANY_KWARGS
         >>> class Service:
         ...     def fetch(self, key: str, **kwargs: object) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -96,7 +98,8 @@ class Matcher(ABC, _Base):
     satisfy this protocol. Use ``&``, ``|``, and ``~`` to combine matchers.
 
     Examples:
-        >>> from dmock import DeclarativeMock, Matcher
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import Matcher
         >>> class Prefix(Matcher):
         ...     def __init__(self, prefix: str, /) -> None:
         ...         self.prefix = prefix
@@ -129,7 +132,7 @@ class Matcher(ABC, _Base):
             Result of :meth:`matches`.
 
         Examples:
-            >>> from dmock import Anything
+            >>> from dmock.matchers import Anything
             >>> Anything == "key"
             True
             >>> "key" == Anything
@@ -147,7 +150,7 @@ class Matcher(ABC, _Base):
             The inverse of :meth:`matches`.
 
         Examples:
-            >>> from dmock import Equals
+            >>> from dmock.matchers import Equals
             >>> Equals("a") != "b"
             True
             >>> "a" != Equals("b")
@@ -165,7 +168,7 @@ class Matcher(ABC, _Base):
             The constant ``0``.
 
         Examples:
-            >>> from dmock import Anything
+            >>> from dmock.matchers import Anything
             >>> hash(Anything)
             0
         """
@@ -180,7 +183,7 @@ class Matcher(ABC, _Base):
             A :class:`Not` wrapping this matcher.
 
         Examples:
-            >>> from dmock import Equals
+            >>> from dmock.matchers import Equals
             >>> ~Equals("a")
             Not(Equals('a'))
             >>> (~Equals("a")) == "b"
@@ -188,7 +191,7 @@ class Matcher(ABC, _Base):
         """
         return Not(self)
 
-    def __and__(self, other: object) -> object:
+    def __and__(self, other: object) -> Matcher:
         """Return a matcher that requires both sides to match.
 
         A non-matcher `other` is wrapped in :class:`Equals`. ``left & right``
@@ -201,7 +204,7 @@ class Matcher(ABC, _Base):
             An :class:`And` matcher.
 
         Examples:
-            >>> from dmock import GreaterThan, LessThan
+            >>> from dmock.matchers import GreaterThan, LessThan
             >>> GreaterThan(0) & LessThan(10)
             And(GreaterThan(0), LessThan(10))
             >>> (GreaterThan(0) & LessThan(10)) == 5
@@ -212,7 +215,7 @@ class Matcher(ABC, _Base):
 
         return And(self, other)
 
-    def __rand__(self, other: object) -> object:
+    def __rand__(self, other: object) -> Matcher:
         """Return a matcher that requires both sides to match.
 
         Used when the left operand is not a :class:`Matcher`. A matcher on
@@ -226,7 +229,7 @@ class Matcher(ABC, _Base):
             already a :class:`Matcher`.
 
         Examples:
-            >>> from dmock import Equals
+            >>> from dmock.matchers import Equals
             >>> 1 & Equals(1)
             And(Equals(1), Equals(1))
             >>> (1 & Equals(1)) == 1
@@ -237,7 +240,7 @@ class Matcher(ABC, _Base):
 
         return NotImplemented
 
-    def __or__(self, other: object) -> object:
+    def __or__(self, other: object) -> Matcher:
         """Return a matcher that requires either side to match.
 
         A non-matcher `other` is wrapped in :class:`Equals`. ``left | right``
@@ -250,7 +253,7 @@ class Matcher(ABC, _Base):
             An :class:`Or` matcher.
 
         Examples:
-            >>> from dmock import Equals
+            >>> from dmock.matchers import Equals
             >>> Equals(1) | 2
             Or(Equals(1), Equals(2))
             >>> (Equals(1) | 2) == 2
@@ -261,7 +264,7 @@ class Matcher(ABC, _Base):
 
         return Or(self, other)
 
-    def __ror__(self, other: object) -> object:
+    def __ror__(self, other: object) -> Matcher:
         """Return a matcher that requires either side to match.
 
         Used when the left operand is not a :class:`Matcher`. A matcher on
@@ -275,7 +278,7 @@ class Matcher(ABC, _Base):
             already a :class:`Matcher`.
 
         Examples:
-            >>> from dmock import Equals
+            >>> from dmock.matchers import Equals
             >>> 1 | Equals(2)
             Or(Equals(1), Equals(2))
             >>> (1 | Equals(2)) == 1
@@ -293,7 +296,8 @@ class _AnythingMatcher(Matcher):
     ``Anything`` and ``Anything()`` are equivalent.
 
     Examples:
-        >>> from dmock import Anything, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import Anything
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -326,7 +330,7 @@ class _NeverMatcher(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Never, Nothing
+        >>> from dmock.matchers import Never, Nothing
         >>> Never is Nothing
         True
         >>> Never() is Never
@@ -363,7 +367,8 @@ class AnythingOfType(Matcher):
         exact: When True, the value's type must be `expected` itself.
 
     Examples:
-        >>> from dmock import AnythingOfType, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import AnythingOfType
         >>> True == AnythingOfType(int)
         True
         >>> True == AnythingOfType(int, exact=True)
@@ -401,7 +406,7 @@ False, so a subclass matches. ``exact=True`` requires
 ``type(value) is expected``.
 
 Examples:
-    >>> from dmock import AnythingOfType, InstanceOf
+    >>> from dmock.matchers import AnythingOfType, InstanceOf
     >>> InstanceOf is AnythingOfType
     True
     >>> True == InstanceOf(int)
@@ -429,7 +434,7 @@ class Equals(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Equals
+        >>> from dmock.matchers import Equals
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -460,7 +465,7 @@ class Not(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Not
+        >>> from dmock.matchers import Not
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -489,7 +494,7 @@ class Maybe(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Maybe
+        >>> from dmock.matchers import Maybe
         >>> class Service:
         ...     def fetch(self, key: str | None) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -520,7 +525,7 @@ class Is(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Is
+        >>> from dmock.matchers import Is
         >>> class Service:
         ...     def fetch(self, key: str | None) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -548,7 +553,8 @@ class MatchedBy(Matcher):
         predicate: Called with the actual argument; a true result is a match.
 
     Examples:
-        >>> from dmock import DeclarativeMock, MatchedBy
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import MatchedBy
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -575,7 +581,7 @@ TRUTHY = MatchedBy(bool)
 
 Examples:
     >>> from dmock import DeclarativeMock
-    >>> from dmock import TRUTHY
+    >>> from dmock.matchers import TRUTHY
     >>> class Service:
     ...     def fetch(self, key: str) -> str: ...
     >>> mock = DeclarativeMock(Service)
@@ -591,7 +597,7 @@ FALSY = MatchedBy(lambda x: not x)
 
 Examples:
     >>> from dmock import DeclarativeMock
-    >>> from dmock import FALSY
+    >>> from dmock.matchers import FALSY
     >>> FALSY.matches("")
     True
     >>> FALSY.matches("a")
@@ -611,7 +617,7 @@ Returns `True` when ``tzinfo is None``. Aware datetimes and other types do not m
 Examples:
     >>> from datetime import datetime, timezone
     >>> from dmock import DeclarativeMock
-    >>> from dmock import NAIVE_DATETIME
+    >>> from dmock.matchers import NAIVE_DATETIME
     >>> NAIVE_DATETIME.matches(datetime(2020, 1, 1))
     True
     >>> NAIVE_DATETIME.matches(datetime(2020, 1, 1, tzinfo=timezone.utc))
@@ -631,7 +637,7 @@ Returns `True` when ``tzinfo is not None``. Naive datetimes and other types do n
 Examples:
     >>> from datetime import datetime, timezone
     >>> from dmock import DeclarativeMock
-    >>> from dmock import AWARE_DATETIME
+    >>> from dmock.matchers import AWARE_DATETIME
     >>> AWARE_DATETIME.matches(datetime(2020, 1, 1, tzinfo=timezone.utc))
     True
     >>> AWARE_DATETIME.matches(datetime(2020, 1, 1))
@@ -653,7 +659,7 @@ class Empty(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import EMPTY
+        >>> from dmock.matchers import EMPTY
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -687,7 +693,8 @@ class HasLen(Matcher):
         expected: Length, or a matcher for the length.
 
     Examples:
-        >>> from dmock import DeclarativeMock, GreaterThan, HasLen
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import GreaterThan, HasLen
         >>> [1, 2, 3] == HasLen(3)
         True
         >>> [1] == HasLen(GreaterThan(2))
@@ -723,7 +730,7 @@ class In(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import In
+        >>> from dmock.matchers import In
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -755,7 +762,7 @@ class Contains(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Contains
+        >>> from dmock.matchers import Contains
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -789,7 +796,7 @@ class Includes(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Includes
+        >>> from dmock.matchers import Includes
         >>> class Service:
         ...     def fetch(self, keys: list[str]) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -832,7 +839,7 @@ class CollectionOf(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import CollectionOf
+        >>> from dmock.matchers import CollectionOf
         >>> (1, 2, 3) == CollectionOf([1, 2, 3])
         True
         >>> (1, 2, 3) == CollectionOf({1, 2, 3})
@@ -912,7 +919,8 @@ class AnyOrder(Matcher):
         items: Expected items. A string is a sequence of characters.
 
     Examples:
-        >>> from dmock import AnyOrder, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import AnyOrder
         >>> [1, 2, 3] == AnyOrder([3, 1, 2])
         True
         >>> [1, 2] == AnyOrder([1, 2, 3])
@@ -981,7 +989,8 @@ class SequenceOf(Matcher):
         expected: Sequence to compare against.
 
     Examples:
-        >>> from dmock import DeclarativeMock, SequenceOf
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import SequenceOf
         >>> (1, 2) == SequenceOf([1, 2])
         True
         >>> "ab" == SequenceOf(["a", "b"])
@@ -1020,7 +1029,8 @@ class SetOf(Matcher):
         expected: Set to compare against.
 
     Examples:
-        >>> from dmock import DeclarativeMock, SetOf
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import SetOf
         >>> frozenset({1, 2}) == SetOf({2, 1})
         True
         >>> [1, 2] == SetOf({1, 2})
@@ -1057,7 +1067,8 @@ class MappingOf(Matcher):
         expected: Mapping to compare against.
 
     Examples:
-        >>> from dmock import DeclarativeMock, MappingOf
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import MappingOf
         >>> {"b": 1, "a": 2} == MappingOf({"a": 2, "b": 1})
         True
         >>> {"a": 1, "b": 2} == MappingOf({"a": 1})
@@ -1097,7 +1108,8 @@ class PartialMapping(Matcher):
         expected: Pairs the mapping must contain.
 
     Examples:
-        >>> from dmock import DeclarativeMock, GreaterThan, PartialMapping
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import GreaterThan, PartialMapping
         >>> {"a": 1, "b": 2} == PartialMapping({"a": GreaterThan(0)})
         True
         >>> {"a": 1} == PartialMapping({"b": 1})
@@ -1205,7 +1217,8 @@ class Namespace(_InstanceAttributesMixin, Matcher):
 
     Examples:
         >>> from types import SimpleNamespace
-        >>> from dmock import DeclarativeMock, GreaterThan, Namespace
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import GreaterThan, Namespace
         >>> SimpleNamespace(name="n", qty=2) == Namespace(name="n", qty=GreaterThan(0))
         True
         >>> SimpleNamespace(name="n", qty=2) == Namespace(name="n")
@@ -1258,7 +1271,8 @@ class PartialNamespace(_InstanceAttributesMixin, Matcher):
 
     Examples:
         >>> from types import SimpleNamespace
-        >>> from dmock import DeclarativeMock, GreaterThan, PartialNamespace
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import GreaterThan, PartialNamespace
         >>> SimpleNamespace(name="n", qty=2) == PartialNamespace(qty=GreaterThan(0))
         True
         >>> SimpleNamespace(name="n") == PartialNamespace(qty=1)
@@ -1297,7 +1311,7 @@ class Attr(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Attr
+        >>> from dmock.matchers import Attr
         >>> class Item:
         ...     name = "n"
         ...     kind = "book"
@@ -1365,7 +1379,7 @@ class Range(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Range
+        >>> from dmock.matchers import Range
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1397,7 +1411,7 @@ class LessThan(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import LessThan
+        >>> from dmock.matchers import LessThan
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1436,7 +1450,7 @@ class GreaterThan(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import GreaterThan
+        >>> from dmock.matchers import GreaterThan
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1475,7 +1489,7 @@ class LessEquals(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import LessEquals
+        >>> from dmock.matchers import LessEquals
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1514,7 +1528,7 @@ class GreaterEquals(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import GreaterEquals
+        >>> from dmock.matchers import GreaterEquals
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1556,7 +1570,7 @@ class Approx(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Approx
+        >>> from dmock.matchers import Approx
         >>> class Service:
         ...     def fetch(self, key: float) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1610,7 +1624,8 @@ class IsNow(Matcher):
 
     Examples:
         >>> from datetime import datetime, timezone
-        >>> from dmock import DeclarativeMock, IsNow
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import IsNow
         >>> datetime.now(timezone.utc) == IsNow()
         True
         >>> class Service:
@@ -1655,7 +1670,7 @@ class StartsWith(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import StartsWith
+        >>> from dmock.matchers import StartsWith
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1686,7 +1701,7 @@ class EndsWith(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import EndsWith
+        >>> from dmock.matchers import EndsWith
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1719,7 +1734,7 @@ class RegexMatch(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Regex, RegexMatch
+        >>> from dmock.matchers import Regex, RegexMatch
         >>> Regex is RegexMatch
         True
         >>> class Service:
@@ -1763,7 +1778,7 @@ class RegexSearch(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import RegexSearch
+        >>> from dmock.matchers import RegexSearch
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1802,7 +1817,7 @@ class RegexFullmatch(Matcher):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import RegexFullmatch
+        >>> from dmock.matchers import RegexFullmatch
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -1840,7 +1855,8 @@ class IsUUID(Matcher):
 
     Examples:
         >>> from uuid import uuid4
-        >>> from dmock import DeclarativeMock, IsUUID
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import IsUUID
         >>> uuid4() == IsUUID(version=4)
         True
         >>> "not-a-uuid" == IsUUID()
@@ -1883,7 +1899,8 @@ IS_UUID = IsUUID()
 
 Examples:
     >>> from uuid import uuid4
-    >>> from dmock import DeclarativeMock, IS_UUID
+    >>> from dmock import DeclarativeMock
+    >>> from dmock.matchers import IS_UUID
     >>> uuid4() == IS_UUID
     True
     >>> "not-a-uuid" == IS_UUID
@@ -1907,7 +1924,8 @@ class IsDataclass(Matcher):
 
     Examples:
         >>> from dataclasses import dataclass
-        >>> from dmock import DeclarativeMock, IsDataclass
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import IsDataclass
         >>> @dataclass
         ... class Item:
         ...     name: str
@@ -1941,7 +1959,8 @@ IS_DATACLASS = IsDataclass()
 
 Examples:
     >>> from dataclasses import dataclass
-    >>> from dmock import DeclarativeMock, IS_DATACLASS
+    >>> from dmock import DeclarativeMock
+    >>> from dmock.matchers import IS_DATACLASS
     >>> @dataclass
     ... class Item:
     ...     name: str
@@ -1971,7 +1990,7 @@ class Args(Matcher):
         *args: Values or matchers combined by the subclass.
 
     Examples:
-        >>> from dmock import Equals, Or
+        >>> from dmock.matchers import Equals, Or
         >>> 1 == Or(1, 2)
         True
         >>> (1 | Equals(2)) == 2
@@ -1979,10 +1998,10 @@ class Args(Matcher):
     """
 
     def __init__(self, /, *args: object) -> None:
-        self.args = args
+        self._args = args
 
     def __repr__(self) -> str:
-        return "{}({})".format(type(self).__name__, ", ".join(map(repr, self.args)))
+        return "{}({})".format(type(self).__name__, ", ".join(map(repr, self._args)))
 
 
 class And(Args):
@@ -1997,7 +2016,7 @@ class And(Args):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import And, GreaterThan, LessThan
+        >>> from dmock.matchers import And, GreaterThan, LessThan
         >>> class Service:
         ...     def fetch(self, key: int) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -2009,7 +2028,7 @@ class And(Args):
 
     def matches(self, value: object, /) -> bool:
         """Return whether every argument matches `value`."""
-        return bool(all(a == value for a in self.args))
+        return bool(all(a == value for a in self._args))
 
 
 class Or(Args):
@@ -2024,7 +2043,7 @@ class Or(Args):
 
     Examples:
         >>> from dmock import DeclarativeMock
-        >>> from dmock import Or
+        >>> from dmock.matchers import Or
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -2036,4 +2055,4 @@ class Or(Args):
 
     def matches(self, value: object, /) -> bool:
         """Return whether any argument matches `value`."""
-        return bool(any(a == value for a in self.args))
+        return bool(any(a == value for a in self._args))

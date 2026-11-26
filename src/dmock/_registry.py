@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from typing import Any
+    from typing import Any, ClassVar
 
     from dmock._mock import DeclarativeMock
+    from dmock._spy import DeclarativeSpy
 
 
 class MockRegistry:
@@ -64,3 +65,55 @@ class MockRegistry:
 
         for mock in mocks:
             mock.verify()
+
+
+class SpyRegistry:
+    """Live spies to verify when a test finishes.
+
+    :class:`~dmock.DeclarativeSpy` registers itself on construction.
+    :meth:`teardown` copies that list, replaces it with an empty one, then
+    calls :meth:`~dmock.DeclarativeSpy.verify` on the copy. Clearing first
+    means a failed verify cannot leak spies into the next test. A later
+    :meth:`teardown` with nothing registered does nothing.
+
+    :meth:`clear` drops registered spies without verifying them.
+
+    Verification is fail-fast. If ``verify`` raises, spies later in the copy
+    are not checked. They have already been dropped from the registry.
+    """
+
+    _spies: ClassVar[list[DeclarativeSpy[Any]]] = []
+
+    @property
+    def spies(self) -> Sequence[DeclarativeSpy[Any]]:
+        """Return a copy of the spies registered right now.
+
+        Read it from any instance (``SpyRegistry().spies``). The copy is a
+        new list, so a later :meth:`add`, :meth:`clear`, or :meth:`teardown`
+        does not change it.
+        """
+        return list(self._spies)
+
+    @classmethod
+    def add(cls, spy: DeclarativeSpy[Any]) -> None:
+        """Remember `spy` until the next :meth:`teardown`."""
+        cls._spies.append(spy)
+
+    @classmethod
+    def clear(cls) -> None:
+        """Drop every registered spy without calling ``verify``."""
+        cls._spies = []
+
+    @classmethod
+    def teardown(cls) -> None:
+        """Verify every registered spy and forget them.
+
+        Raises:
+            UnsatisfiedObservationError: A registered spy is unmet.
+                Remaining spies in this batch are not verified.
+        """
+        spies = list(cls._spies)
+        cls._spies = []
+
+        for spy in spies:
+            spy.verify()

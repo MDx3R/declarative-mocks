@@ -8,24 +8,23 @@ from unittest.mock import MagicMock, Mock, NonCallableMagicMock
 
 import pytest
 
-from dmock import (
+from dmock._interaction import in_order
+from dmock._mock import DeclarativeMock, dmock
+from dmock.exceptions._exceptions import (
+    BlockedCallError,
+    ConfigurationError,
+    NoMatchingCallError,
+    UnexpectedCallError,
+    UnregisteredCallError,
+    UnsatisfiedExpectationError,
+)
+from dmock.matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
     AnythingOfType,
-    ConfigurationError,
-    DeclarativeMock,
     LessThan,
     MatchedBy,
-    UnexpectedCallError,
-    UnsatisfiedExpectationError,
-    dmock,
-    in_order,
-)
-from dmock._exceptions import (
-    BlockedCallError,
-    NoMatchingCallError,
-    UnregisteredCallError,
 )
 
 
@@ -78,7 +77,7 @@ class TestBasicDispatch:
     def test_returns_configured_value(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
-        mock.expect("process_order", 123).returns("ok")
+        mock.expect(MyService.process_order, 123).returns("ok")
 
         # Act
         result = mock.process_order(123)
@@ -365,9 +364,10 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnexpectedCallError) as exc_info:
             mock.do_something()
+
         assert type(exc_info.value) is UnregisteredCallError
         assert str(exc_info.value) == (
-            "Unexpected call: 'do_something' has no registered expectation."
+            "Unexpected call: 'do_something' has no registered interaction."
         )
 
     def test_args_mismatch_lists_candidate(self) -> None:
@@ -378,10 +378,11 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnexpectedCallError) as exc_info:
             mock.process_order(1)
+
         assert type(exc_info.value) is NoMatchingCallError
         assert str(exc_info.value) == (
             "Unexpected call: 'process_order' called with args=(1,), kwargs={} "
-            "- no matching non-exhausted expectation.\n"
+            "- no matching non-exhausted interaction.\n"
             "Candidates:\n"
             "  Expectation(process_order(99)) - args mismatch\n"
             "Call history:\n"
@@ -397,10 +398,11 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnexpectedCallError) as exc_info:
             mock.do_something()
+
         assert type(exc_info.value) is NoMatchingCallError
         assert str(exc_info.value) == (
             "Unexpected call: 'do_something' called with args=(), kwargs={} "
-            "- no matching non-exhausted expectation.\n"
+            "- no matching non-exhausted interaction.\n"
             "Candidates:\n"
             "  Expectation(do_something()) - exhausted (1/1 calls)\n"
             "Call history:\n"
@@ -418,10 +420,11 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnexpectedCallError) as exc_info:
             mock.process_order(3)
+
         assert type(exc_info.value) is NoMatchingCallError
         assert str(exc_info.value) == (
             "Unexpected call: 'process_order' called with args=(3,), kwargs={} "
-            "- no matching non-exhausted expectation.\n"
+            "- no matching non-exhausted interaction.\n"
             "Candidates:\n"
             "  Expectation(process_order(1)) - exhausted (1/1 calls)\n"
             "  Expectation(process_order(2)) - args mismatch\n"
@@ -439,6 +442,7 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnexpectedCallError) as exc_info:
             mock.process_order(1)
+
         assert type(exc_info.value) is BlockedCallError
         assert str(exc_info.value) == (
             "Out-of-order call: 'process_order' called with args=(1,), kwargs={}\n"
@@ -457,6 +461,7 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnsatisfiedExpectationError) as exc_info:
             mock.verify()
+
         assert str(exc_info.value) == (
             "Unsatisfied expectations:\n"
             "  Expectation(do_something()) - expected exactly 2 call(s), got 1\n"
@@ -473,6 +478,7 @@ class TestErrorDiagnostics:
         # Act & Assert
         with pytest.raises(UnsatisfiedExpectationError) as exc_info:
             mock.verify()
+
         assert str(exc_info.value) == (
             "Unsatisfied expectations:\n"
             "  Expectation(do_something()) - expected at least 2 call(s), got 1\n"
@@ -551,6 +557,7 @@ class TestAssertExpectations:
         # Act & Assert
         with pytest.raises(UnsatisfiedExpectationError) as exc_info:
             mock.verify()
+
         assert "process_order" in str(exc_info.value)
 
 
@@ -1053,6 +1060,33 @@ class TestNotBefore:
         # Assert
         assert result == "b"
 
+    def test_chained_expect_forwards_args_and_enforces_order(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        (
+            mock.expect("do_something")
+            .returns("a")
+            .once()
+            .expect("process_order", 1)
+            .returns("b")
+            .once()
+            .expect("greet", name="ada")
+            .returns("hi")
+            .once()
+        )
+
+        # Act & Assert
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+        mock.do_something()
+        with pytest.raises(UnexpectedCallError, match="process_order"):
+            mock.greet(name="ada")
+
+        assert mock.process_order(1) == "b"
+        assert mock.greet(name="ada") == "hi"
+        mock.verify()
+
     def test_not_before_unsatisfied_raises(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
@@ -1302,3 +1336,30 @@ class TestInOrder:
 
         # Assert
         assert result == "b"
+
+    def test_chained_expect_forwards_args_and_enforces_order(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        (
+            mock.expect("do_something")
+            .returns("a")
+            .once()
+            .expect("process_order", 1)
+            .returns("b")
+            .once()
+            .expect("greet", name="ada")
+            .returns("hi")
+            .once()
+        )
+
+        # Act & Assert
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+        mock.do_something()
+        with pytest.raises(UnexpectedCallError, match="process_order"):
+            mock.greet(name="ada")
+
+        assert mock.process_order(1) == "b"
+        assert mock.greet(name="ada") == "hi"
+        mock.verify()

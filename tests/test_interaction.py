@@ -1,31 +1,38 @@
-"""Tests for dmock._expectation."""
+"""Tests for dmock._interaction."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Generic
 
 import pytest
 
-from dmock._exceptions import (
+from dmock._interaction import Interaction, Mediator
+from dmock._protocols import T
+from dmock._types import (
+    AtLeast,
+    Between,
+    ConditionCheck,
+    DefaultOutcome,
+    ExactlyN,
+    Never,
+    RaiseCheck,
+    RaiseOutcome,
+    ReturnCheck,
+    ReturnOutcome,
+    RunOutcome,
+)
+from dmock.exceptions._exceptions import (
     ConfigurationError,
     ExceededCallError,
     UnexpectedCallError,
 )
-from dmock._expectation import Expectation
-from dmock._matchers import ANY_ARGS, ANY_KWARGS, Anything, AnythingOfType, MatchedBy
-from dmock._types import (
-    AtLeast,
-    Between,
-    DefaultOutcome,
-    ExactlyN,
-    Never,
-    RaiseOutcome,
-    ReturnOutcome,
-    RunOutcome,
-)
+from dmock.matchers import ANY_ARGS, ANY_KWARGS, Anything, AnythingOfType, MatchedBy
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from dmock._interaction import Expectation, Observation
     from dmock._types import Quantifier
 
 
@@ -34,10 +41,17 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+class NoOpMediator(Mediator[T], Generic[T]):
+    def mediate(
+        self, name: str | Callable[..., object], /, *args: object, **kwargs: object
+    ) -> Expectation[Any, Any, Any] | Observation[Any, Any, Any]:
+        raise NotImplementedError
+
+
 def make(
     name: str = "method", *args: object, **kwargs: object
-) -> Expectation[..., object]:
-    return Expectation(name, args, kwargs)
+) -> Interaction[Any, ..., Any]:
+    return Interaction(NoOpMediator[Any](), "Interaction", name, args, kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -197,17 +211,35 @@ class TestMatchingPositional:
 class TestMatchingKeyword:
     def test_exact_kwargs_match(self) -> None:
         assert (
-            Expectation("f", (), {"x": 1, "y": 2}).matches((), {"x": 1, "y": 2}) is True
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (), {"x": 1, "y": 2}
+            ).matches((), {"x": 1, "y": 2})
+            is True
         )
 
     def test_kwargs_mismatch_value(self) -> None:
-        assert Expectation("f", (), {"x": 1}).matches((), {"x": 99}) is False
+        assert (
+            Interaction(NoOpMediator[Any](), "Interaction", "f", (), {"x": 1}).matches(
+                (), {"x": 99}
+            )
+            is False
+        )
 
     def test_kwargs_mismatch_key(self) -> None:
-        assert Expectation("f", (), {"x": 1}).matches((), {"y": 1}) is False
+        assert (
+            Interaction(NoOpMediator[Any](), "Interaction", "f", (), {"x": 1}).matches(
+                (), {"y": 1}
+            )
+            is False
+        )
 
     def test_kwargs_extra_key_rejected(self) -> None:
-        assert Expectation("f", (), {"x": 1}).matches((), {"x": 1, "y": 2}) is False
+        assert (
+            Interaction(NoOpMediator[Any](), "Interaction", "f", (), {"x": 1}).matches(
+                (), {"x": 1, "y": 2}
+            )
+            is False
+        )
 
     @pytest.mark.parametrize(
         ("kwargs", "expected"),
@@ -215,7 +247,9 @@ class TestMatchingKeyword:
     )
     def test_matcher_in_kwargs(self, kwargs: dict[str, object], expected: bool) -> None:
         assert (
-            Expectation("f", (), {"x": AnythingOfType(str)}).matches((), kwargs)
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (), {"x": AnythingOfType(str)}
+            ).matches((), kwargs)
             is expected
         )
 
@@ -228,12 +262,17 @@ class TestMatchingKeyword:
 class TestMatchingMixed:
     def test_positional_and_kwargs(self) -> None:
         assert (
-            Expectation("f", (1,), {"key": "val"}).matches((1,), {"key": "val"}) is True
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (1,), {"key": "val"}
+            ).matches((1,), {"key": "val"})
+            is True
         )
 
     def test_positional_mismatch_but_kwargs_ok(self) -> None:
         assert (
-            Expectation("f", (1,), {"key": "val"}).matches((2,), {"key": "val"})
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (1,), {"key": "val"}
+            ).matches((2,), {"key": "val"})
             is False
         )
 
@@ -246,11 +285,21 @@ class TestMatchingMixed:
 class TestMatchingSentinels:
     @pytest.mark.parametrize("args", [(1, 2, 3), ()])
     def test_any_args_accepts_any_positional(self, args: tuple[object, ...]) -> None:
-        assert Expectation("f", (ANY_ARGS,), {}).matches(args, {}) is True
+        assert (
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (ANY_ARGS,), {}
+            ).matches(args, {})
+            is True
+        )
 
     @pytest.mark.parametrize("kwargs", [{"a": 1, "b": 2}, {}])
     def test_any_kwargs_accepts_any_kwargs(self, kwargs: dict[str, object]) -> None:
-        assert Expectation("f", (ANY_KWARGS,), {}).matches((), kwargs) is True
+        assert (
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (ANY_KWARGS,), {}
+            ).matches((), kwargs)
+            is True
+        )
 
     @pytest.mark.parametrize(
         ("args", "kwargs"),
@@ -260,7 +309,10 @@ class TestMatchingSentinels:
         self, args: tuple[object, ...], kwargs: dict[str, object]
     ) -> None:
         assert (
-            Expectation("f", (ANY_ARGS, ANY_KWARGS), {}).matches(args, kwargs) is True
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (ANY_ARGS, ANY_KWARGS), {}
+            ).matches(args, kwargs)
+            is True
         )
 
     @pytest.mark.parametrize(
@@ -271,7 +323,9 @@ class TestMatchingSentinels:
         self, kwargs: dict[str, object], expected: bool
     ) -> None:
         assert (
-            Expectation("f", (ANY_ARGS,), {"key": "val"}).matches((1, 2), kwargs)
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (ANY_ARGS,), {"key": "val"}
+            ).matches((1, 2), kwargs)
             is expected
         )
 
@@ -279,7 +333,12 @@ class TestMatchingSentinels:
     def test_any_kwargs_with_expected_args(
         self, args: tuple[object, ...], expected: bool
     ) -> None:
-        assert Expectation("f", (1, 2, ANY_KWARGS), {}).matches(args, {}) is expected
+        assert (
+            Interaction(
+                NoOpMediator[Any](), "Interaction", "f", (1, 2, ANY_KWARGS), {}
+            ).matches(args, {})
+            is expected
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -297,8 +356,32 @@ class TestOutcomeSequencing:
         )
 
     def test_single_runs(self) -> None:
-        fn = lambda: None  # noqa: E731
+        def fn() -> None:
+            return None
+
         assert make("f").runs(fn).at_least(1).consume() == RunOutcome(fn)
+
+    def test_single_returns_check(self) -> None:
+        def fn(_: str) -> bool:
+            return True
+
+        assert make("f").returns("ok", condition=fn).once().consume() == ReturnCheck(
+            "ok", fn
+        )
+
+    def test_single_raises_check(self) -> None:
+        def fn(exc: ValueError) -> bool:
+            return True
+
+        assert make("f").raises(ValueError, condition=fn).at_least(
+            1
+        ).consume() == RaiseCheck(ValueError, fn)
+
+    def test_single_condition(self) -> None:
+        def fn(_: str) -> bool:
+            return True
+
+        assert make("f").condition(fn).at_least(1).consume() == ConditionCheck(fn)
 
     def test_chained_returns_sequence(self) -> None:
         exp = make("f").returns("a").returns("b")
@@ -318,7 +401,7 @@ class TestOutcomeSequencing:
         with pytest.raises(ExceededCallError):
             exp.consume()
 
-    def test_repeat_then_another_return(self) -> None:
+    def test_repeat_then_another_returns(self) -> None:
         exp = make("f").returns(1, repeat=2).returns(2)
         assert exp.consume() == ReturnOutcome(1)
         assert exp.consume() == ReturnOutcome(1)
@@ -330,20 +413,54 @@ class TestOutcomeSequencing:
         assert exp.consume() == RaiseOutcome(ValueError)
 
     def test_repeat_appends_the_same_runs(self) -> None:
-        fn = lambda: None  # noqa: E731
+        def fn() -> None:
+            return None
+
         exp = make("f").runs(fn, repeat=2)
         assert exp.consume() == RunOutcome(fn)
         assert exp.consume() == RunOutcome(fn)
 
+    def test_repeat_then_another_return_check(self) -> None:
+        def fn(_: str) -> bool:
+            return True
+
+        exp = make("f").returns("ok", condition=fn, repeat=2)
+        assert exp.consume() == ReturnCheck("ok", fn)
+        assert exp.consume() == ReturnCheck("ok", fn)
+
+    def test_repeat_appends_the_same_raises_check(self) -> None:
+        def fn(exc: ValueError) -> bool:
+            return True
+
+        exp = make("f").raises(ValueError, condition=fn, repeat=2)
+        assert exp.consume() == RaiseCheck(ValueError, fn)
+        assert exp.consume() == RaiseCheck(ValueError, fn)
+
+    def test_repeat_appends_the_same_condition(self) -> None:
+        def fn(_: str) -> bool:
+            return True
+
+        exp = make("f").condition(fn, repeat=2)
+        assert exp.consume() == ConditionCheck(fn)
+        assert exp.consume() == ConditionCheck(fn)
+
     @pytest.mark.parametrize("repeat", [0, -1])
     def test_repeat_below_one_raises(self, repeat: int) -> None:
-        fn = lambda: None  # noqa: E731
+        def fn(_: Any) -> bool:
+            return True
+
         with pytest.raises(ConfigurationError, match="repeat"):
             make("f").returns("ok", repeat=repeat)
         with pytest.raises(ConfigurationError, match="repeat"):
             make("f").raises(ValueError, repeat=repeat)
         with pytest.raises(ConfigurationError, match="repeat"):
             make("f").runs(fn, repeat=repeat)
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").returns("ok", condition=fn, repeat=repeat)
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").raises(ValueError, condition=fn, repeat=repeat)
+        with pytest.raises(ConfigurationError, match="repeat"):
+            make("f").condition(fn, repeat=repeat)
 
     def test_last_outcome_repeats_after_list_end(self) -> None:
         exp = make("f").returns("a").returns("b").at_least(1)
@@ -645,18 +762,113 @@ class TestCallCount:
 
 class TestRepr:
     def test_contains_method_name(self) -> None:
-        assert "my_method" in repr(make("my_method"))
+        assert repr(make("my_method")) == "Interaction(my_method())"
 
     def test_contains_positional_args(self) -> None:
-        result = repr(make("f", 1, "hello"))
-        assert "1" in result
-        assert "'hello'" in result
+        assert repr(make("f", 1, "hello")) == "Interaction(f(1, 'hello'))"
 
     def test_contains_kwargs(self) -> None:
-        assert "key=42" in repr(make("f", key=42))
+        assert repr(make("f", key=42)) == "Interaction(f(key=42))"
 
     def test_contains_any_args_sentinel(self) -> None:
-        assert "ANY_ARGS" in repr(make("f", ANY_ARGS))
+        assert repr(make("f", ANY_ARGS)) == "Interaction(f(ANY_ARGS))"
 
     def test_contains_any_kwargs_sentinel(self) -> None:
-        assert "ANY_KWARGS" in repr(make("f", ANY_KWARGS))
+        assert repr(make("f", ANY_KWARGS)) == "Interaction(f(ANY_KWARGS))"
+
+
+# ---------------------------------------------------------------------------
+# Spy checks, mediation, and diamond dependencies
+# ---------------------------------------------------------------------------
+
+
+class TestSpyChecksAndMediation:
+    def test_returns_with_condition_produces_return_check(self) -> None:
+        # Arrange
+        def cond(v: object) -> bool:
+            return v == "ok"
+
+        obs = make("f").returns("ok", condition=cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == ReturnCheck("ok", cond)
+
+    def test_raises_with_condition_produces_raise_check(self) -> None:
+        # Arrange
+        def cond(exc: object) -> bool:
+            return isinstance(exc, ValueError)
+
+        obs = make("f").raises(ValueError, condition=cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == RaiseCheck(ValueError, cond)
+
+    def test_condition_produces_condition_check(self) -> None:
+        # Arrange
+        def cond(v: object) -> bool:
+            return v is not None
+
+        obs = make("f").condition(cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == ConditionCheck(cond)
+
+    def test_chained_expect_and_observe_mediate_and_link_not_before(self) -> None:
+        # Arrange
+        recorded: list[
+            tuple[str | Callable[..., object], tuple[object, ...], dict[str, object]]
+        ] = []
+
+        class RecordingMediator(Mediator[Any]):
+            def mediate(
+                self,
+                name: str | Callable[..., object],
+                /,
+                *args: object,
+                **kwargs: object,
+            ) -> Expectation[Any, Any, Any] | Observation[Any, Any, Any]:
+                recorded.append((name, args, dict(kwargs)))
+                return Interaction(self, "Interaction", str(name), args, dict(kwargs))
+
+        med = RecordingMediator()
+        first: Interaction[Any, Any, Any] = Interaction(
+            med, "Expectation", "start", (), {}
+        )
+
+        # Act
+        second = first.expect("step", 1, flag=True)
+        third = Interaction(med, "Observation", "step", (), {}).observe(
+            "finish", "x", mode="fast"
+        )
+
+        # Assert
+        assert recorded == [
+            ("step", (1,), {"flag": True}),
+            ("finish", ("x",), {"mode": "fast"}),
+        ]
+        assert list(second.requires) == [first]
+        assert third.requires[0].method_name == "step"
+
+    def test_diamond_dependency_graph_is_allowed(self) -> None:
+        # Arrange
+        root = make("root")
+        left = make("left").not_before(root)
+        right = make("right").not_before(root)
+        leaf = make("leaf")
+
+        # Act
+        leaf.not_before(left, right)
+
+        # Assert
+        assert list(leaf.requires) == [left, right]
+        with pytest.raises(ConfigurationError):
+            root.not_before(leaf)

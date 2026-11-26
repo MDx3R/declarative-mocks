@@ -6,13 +6,13 @@ from abc import ABC, abstractmethod
 
 import pytest
 
-from dmock import (
+from dmock._interaction import in_order
+from dmock._mock import DeclarativeMock
+from dmock.matchers import (
     Anything,
     AnythingOfType,
-    DeclarativeMock,
     GreaterThan,
     Regex,
-    in_order,
 )
 
 
@@ -78,7 +78,8 @@ class TestPluginReportsTheTest:
             """
             from abc import ABC
 
-            from dmock import AnythingOfType, DeclarativeMock, GreaterThan, in_order
+            from dmock import DeclarativeMock, in_order
+            from dmock.matchers import AnythingOfType, GreaterThan
 
             class Billing(ABC):
                 def quote(self, sku: str) -> int: ...
@@ -110,7 +111,8 @@ class TestPluginReportsTheTest:
         # Arrange
         pytester.makepyfile(
             """
-            from dmock import DeclarativeMock, Regex
+            from dmock import DeclarativeMock
+            from dmock.matchers import Regex
 
             class Billing:
                 def quote(self, sku: str) -> int: ...
@@ -199,3 +201,33 @@ class TestPluginReportsTheTest:
                 "*Unsatisfied expectations*",
             ]
         )
+
+    def test_unmet_spy_observation_fails_and_does_not_leak(
+        self, pytester: pytest.Pytester
+    ) -> None:
+        # Arrange
+        pytester.makepyfile(
+            """
+            from dmock import DeclarativeSpy
+
+            class Billing:
+                def charge(self, amount: int) -> int:
+                    return amount
+
+            def test_unmet_spy() -> None:
+                billing = DeclarativeSpy(Billing())
+                billing.observe("charge", 10).returns(10).once()
+
+            def test_later_spy_is_independent() -> None:
+                billing = DeclarativeSpy(Billing())
+                billing.observe("charge", 5).returns(5).once()
+                assert billing.charge(5) == 5
+            """
+        )
+
+        # Act
+        result = pytester.runpytest()
+
+        # Assert
+        result.assert_outcomes(failed=1, passed=1)
+        result.stdout.fnmatch_lines(["*Unsatisfied observations*", "*charge*"])

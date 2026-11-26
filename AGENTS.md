@@ -58,7 +58,7 @@ pre-commit run --all-files
 ## Documentation to read before behavioral changes
 
 - [SPEC.md](SPEC.md) - behavior, ordering rules, edge cases.
-- [REFERENCE.md](REFERENCE.md) - DSL surface (expectations, quantifiers, matchers).
+- [REFERENCE.md](REFERENCE.md) - DSL surface (expectations, observations, quantifiers, matchers, checks, exceptions).
 - [CONTRIBUTING.md](CONTRIBUTING.md) - setup, Conventional Commits, AAA in tests.
 
 Update SPEC/REFERENCE when user-visible behavior or the public DSL changes.

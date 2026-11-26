@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from dmock._exceptions import ConfigurationError
+from dmock.exceptions._exceptions import ConfigurationError
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Any
 
 
 # -- Outcomes --
@@ -35,6 +36,29 @@ class RunOutcome:
 
 
 @dataclass(frozen=True, slots=True)
+class ReturnCheck:
+    """Check `value` from a matching call."""
+
+    value: object
+    func: Callable[[Any], bool] | None
+
+
+@dataclass(frozen=True, slots=True)
+class RaiseCheck:
+    """Check raised `exception` from a matching call."""
+
+    exception: BaseException | type[BaseException]
+    func: Callable[[Any], bool] | None
+
+
+@dataclass(frozen=True, slots=True)
+class ConditionCheck:
+    """Call `func` from a matching call."""
+
+    func: Callable[[Any], bool]
+
+
+@dataclass(frozen=True, slots=True)
 class DefaultOutcome:
     """Returned by consume() when no explicit outcome was registered.
 
@@ -43,7 +67,15 @@ class DefaultOutcome:
     """
 
 
-Outcome = ReturnOutcome | RaiseOutcome | RunOutcome | DefaultOutcome
+Outcome = (
+    ReturnOutcome
+    | RaiseOutcome
+    | RunOutcome
+    | ReturnCheck
+    | RaiseCheck
+    | ConditionCheck
+    | DefaultOutcome
+)
 
 
 # -- Recorded calls --

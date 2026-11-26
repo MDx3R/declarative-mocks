@@ -1,18 +1,21 @@
 # REFERENCE - DSL surface (declarative-mocks)
 
-Catalog of the **public** DSL. Import package: **`dmock`**.
+Catalog of the **public** DSL across its four public modules:
 
-Public names: `DeclarativeMock`, `Expectation`, `in_order`, `Matcher`, `ANY_ARGS`, `ANY_KWARGS`, every matcher in the table below, `DeclarativeMockError`, `UnexpectedCallError`, `UnsatisfiedExpectationError`, `ConfigurationError`.
+- **`dmock`**: `DeclarativeMock`, `DeclarativeSpy`, `Expectation`, `Observation`, `dmock`, `dspy`, `in_order`
+- **`dmock.checks`**: `Check`, `CheckAnd`, `CheckNot`, `CheckOr`
+- **`dmock.matchers`**: `Matcher`, `ANY_ARGS`, `ANY_KWARGS`, and every matcher in the table below
+- **`dmock.exceptions`**: `DeclarativeMockError`, `UnexpectedCallError`, `UnsatisfiedExpectationError`, `UnsatisfiedObservationError`, `ConfigurationError`
 
-## Main type
+## Main types
 
-### `DeclarativeMock(spec, /, **kwargs)`
+### `DeclarativeMock(spec, /, **kwargs)` and `dmock(spec, /, **kwargs)`
 
-Constructs a whitelist mock that wraps `unittest.mock.Mock(spec=spec, **kwargs)` internally (composition, not inheritance). `spec` is positional-only; additional keyword arguments are forwarded to `unittest.mock.Mock`.
+Constructs a whitelist mock that wraps `unittest.mock.Mock(spec=spec, **kwargs)` internally (composition, not inheritance). `spec` is positional-only; additional keyword arguments are forwarded to `unittest.mock.Mock`. `dmock(spec)` is a convenience factory equivalent to `DeclarativeMock(spec)`.
 
 Every spec method call must be preceded by a matching `expect()` registration; calls without one raise `UnexpectedCallError`. Dunder methods (e.g. `__repr__`) delegate to the internal Mock unless explicitly registered.
 
-Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The caller must `await` the call. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction(mock.async_method)` is true on every supported Python (3.11-3.14).
+Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The caller must `await` the call. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction(mock.async_method)` is true on every supported Python (3.11-3.15).
 
 The names `expect`, `property`, and `verify` are reserved for the DSL. If the spec defines any of them, `DeclarativeMock(spec)` raises `ConfigurationError` at construction time (the real attribute would otherwise be shadowed by the DSL method).
 
@@ -25,6 +28,25 @@ mock = DeclarativeMock(MyService)
 mock.expect("process_order", 123).returns("processed")
 result = mock.process_order(123)  # "processed"
 mock.verify()
+```
+
+### `DeclarativeSpy(obj, /)` and `dspy(obj, /)`
+
+Constructs a pass-through spy wrapping a live object instance `obj` (positional-only). Passing a class/type raises `ConfigurationError`. `dspy(obj)` is a convenience factory equivalent to `DeclarativeSpy(obj)`.
+
+Unhooked attributes and methods delegate directly to `obj`. Methods registered via `observe()` still execute on `obj` (sync or async), while their arguments, call counts, ordering, and return values or raised exceptions are checked against the declared observations. Calling a hooked method with arguments that match no non-exhausted observation raises `UnexpectedCallError`.
+
+The names `observe` and `verify` are reserved for the DSL. If `obj` defines either, `DeclarativeSpy(obj)` raises `ConfigurationError` at construction time.
+
+**Usage sketch:**
+
+```python
+from dmock import DeclarativeSpy
+
+spy = DeclarativeSpy(MyService())
+spy.observe(MyService.process_order, 123).returns("processed").once()
+result = spy.process_order(123)  # executes real method, checks return == "processed"
+spy.verify()
 ```
 
 ## Expectations
@@ -60,6 +82,47 @@ Calls `func(*args, **kwargs)` with the actual call arguments when this expectati
 Chaining `runs` then `returns` schedules **two** outcomes for **two** successive calls, not a side effect plus a return on the same call.
 
 On an async spec method, `func` may be sync or `async def`. The dispatcher awaits awaitable results.
+
+### `… .expect(name, /, *args, **kwargs)`
+
+Registers a follow-up expectation on the parent `DeclarativeMock` and automatically chains `.not_before(self)`, so the new expectation cannot match until `self` is satisfied. Returns the new `Expectation`.
+
+## Observations (`DeclarativeSpy`)
+
+### `spy.observe(name, /, *args, **kwargs)`
+
+Registers an observation for callable attribute `name` on the wrapped object. `name` is a string or an unbound method/callable from the wrapped object's class. Absence of `args`/`kwargs` after `name` means **no arguments** to the call, not a wildcard.
+
+A method lets a type checker check `*args`/`**kwargs` and `.returns` / `.raises` against that method. Async methods unwrap the coroutine result in that check.
+
+Raises `AttributeError` if `name` is not on the wrapped object. Raises `ConfigurationError` if `name` is not callable or cannot be resolved. Returns an `Observation` for chaining checks and quantifiers.
+
+### `… .returns(value, *, condition=None, repeat=1)`
+
+Asserts that the real call returned a value equal to `value` (`actual == value`). If `condition` is provided, calls `condition(actual)` after `value` matches and asserts it returns truthy. Raises `DeclarativeMockError` if the real call raised, returned a different value, or `condition` returned falsy; otherwise returns the real value. `repeat` works as on `Expectation.returns`.
+
+### `… .raises(exc, *, condition=None, repeat=1)`
+
+Asserts that the real call raised `exc` (type checked via `isinstance`, or instance checked via matching type and `str(actual) == str(exc)`). If `condition` is provided, calls `condition(actual_exc)` after `exc` matches. Raises `DeclarativeMockError` on mismatch; otherwise re-raises the real exception. `repeat` works as on `Expectation.raises`.
+
+### `… .condition(func, *, repeat=1)`
+
+Calls `func(result)` with the real return value or raised exception and asserts it returns truthy. Raises `DeclarativeMockError` if falsy; otherwise returns the real value or re-raises the real exception. `repeat` works as on `Expectation.returns`.
+
+### `… .observe(name, /, *args, **kwargs)`
+
+Registers a follow-up observation on the parent `DeclarativeSpy` and automatically chains `.not_before(self)`, returning the new `Observation`.
+
+## Checks (`dmock.checks`)
+
+Composable predicate wrappers for `Observation` `condition` checks:
+
+| Type / Operator                    | Role                                                       |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `Check(*predicates)`               | True when every predicate returns truthy (AND semantics)   |
+| `CheckNot(*predicates)` / `~check` | True when no predicate matches                             |
+| `CheckAnd(*predicates)` / `a & b`  | True when all predicates match (supports plain callables)  |
+| `CheckOr(*predicates)` / `a \| b`  | True when any predicate matches (supports plain callables) |
 
 ## Chaining multiple outcomes
 
@@ -139,7 +202,7 @@ Not a quantifier. Marks the expectation optional: zero calls still pass `verify(
 | `RegexSearch`                               | `re.search` anywhere in a string                                     |
 | `RegexFullmatch`                            | `re.fullmatch` against the whole string                              |
 | `And` / `Or` / `Args`                       | Every argument matches, or any argument matches. `&` and `\|` too    |
-| `dmock.ANY_ARGS, dmock.ANY_KWARGS`          | Wildcard matchers for any number of positional and keyword arguments |
+| `ANY_ARGS, ANY_KWARGS`                      | Wildcard matchers for any number of positional and keyword arguments |
 
 `Matcher` is a public protocol with a single `matches(value) -> bool` method. Implement it to add a custom matcher; built-in matchers already satisfy it. `ANY_ARGS` and `ANY_KWARGS` are sentinels, not `Matcher`s.
 
@@ -152,7 +215,7 @@ mock.expect("process_order", Anything()).returns("processed").at_least(1)
 Variadic calls (any `*args` / `**kwargs` shape):
 
 ```python
-from dmock import ANY_ARGS, ANY_KWARGS
+from dmock.matchers import ANY_ARGS, ANY_KWARGS
 
 mock.expect("process_order", ANY_ARGS, ANY_KWARGS).returns("processed").at_least(1)
 ```
@@ -223,20 +286,21 @@ Calling expectations out of order raises `UnexpectedCallError`.
 
 ## Assertions
 
-### `mock.verify()`
+### `mock.verify()` / `spy.verify()`
 
-Final verification: all registered expectations must be satisfied according to their quantifiers. Raises `UnsatisfiedExpectationError` with a message listing every unsatisfied expectation as `Expectation(...) - expected <constraint>, got <n>`. Expectations marked `.maybe()` that were never called do not contribute to failures. When any calls were dispatched, the message also includes a call history.
+Final verification: all registered expectations or observations must be satisfied according to their quantifiers. `mock.verify()` raises `UnsatisfiedExpectationError` and `spy.verify()` raises `UnsatisfiedObservationError`, each with a message listing every unmet item as `Expectation(...) - expected <constraint>, got <n>` or `Observation(...) - expected <constraint>, got <n>`. Items marked `.maybe()` that were never called do not contribute to failures. When any calls were dispatched, the message also includes a call history.
 
-Under pytest this check runs when the test finishes. An unmet expectation fails the test. An exception the test already raised is left in place. Mocks created while fixtures finalize are checked after teardown and do not leak into the next test. Calling `verify()` yourself still works. Other runners do not do this.
+Under pytest this check runs when the test finishes for both mocks and spies. An unmet expectation or observation fails the test. An exception the test already raised is left in place. Mocks and spies created while fixtures finalize are checked after teardown and do not leak into the next test. Calling `verify()` yourself still works. Other runners do not do this.
 
-## Errors
+## Errors (`dmock.exceptions`)
 
-| Exception                     | When raised                                                                                                                                     |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DeclarativeMockError`        | Base type for the three public errors below                                                                                                     |
-| `UnexpectedCallError`         | A method is called without a matching registered expectation, or a `never()` expectation matches, or all matching expectations are exhausted    |
-| `UnsatisfiedExpectationError` | `verify()` finds one or more expectations not satisfied                                                                                         |
-| `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names on the spec, `expect`/`property` clash, cycles in `not_before`, `repeat` less than 1 |
+| Exception                     | When raised                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DeclarativeMockError`        | Base type for the public errors below; also raised by `DeclarativeSpy` when a `.returns()`, `.raises()`, or `.condition()` check fails                        |
+| `UnexpectedCallError`         | A method is called without a matching registered interaction, or a `never()` interaction matches, or all matching interactions are exhausted                  |
+| `UnsatisfiedExpectationError` | `DeclarativeMock.verify()` finds one or more expectations not satisfied                                                                                       |
+| `UnsatisfiedObservationError` | `DeclarativeSpy.verify()` finds one or more observations not satisfied                                                                                        |
+| `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names, `expect`/`property` clash, cycles in `not_before`, `repeat < 1`, non-instance/non-callable on spy |
 
 `UnexpectedCallError` for a dispatched call includes the actual `args`/`kwargs`, then a **Candidates** list of registered expectations for that name with a reason for each: `args mismatch`, `exhausted (n/max calls)`, or `blocked by <method> (expected …, got …)`. Out-of-order calls use the `blocked by` form. Messages also include a **Call history** of prior (and the failing) dispatches. Matching and ordering rules are unchanged; only the text is richer. The public type to catch is `UnexpectedCallError`; the raised instance is a more specific subclass so the traceback names the case (unregistered, no match, blocked, exceeded). Those subclasses are not part of the public DSL.
 

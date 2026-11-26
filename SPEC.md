@@ -4,21 +4,24 @@ This document describes **what** the library must do from a tester's perspective
 
 ## Purpose
 
-The library provides a **declarative** layer over `unittest.mock` (typically `Mock` with `spec=…`) so tests can express **ordered expectations**, **return values**, **exceptions**, **side effects**, and **call-count constraints** in a fluent API.
+The library provides a **declarative** layer over `unittest.mock` (typically `Mock` with `spec=…`) and live objects (`DeclarativeSpy`) so tests can express **ordered expectations and observations**, **return values**, **exceptions**, **side effects**, **result checks**, and **call-count constraints** in a fluent API.
 
 ## Core principles
 
-1. **Order matters (per-name)** - expectations for the same attribute name are consumed in the order they were registered. Expectations for different method names are independent and may be called in any order.
-2. **Whitelist proxy** - any call to a spec method without a prior `expect()` registration raises `UnexpectedCallError`. The mock is strict by default; regular methods do not fall through to `unittest.mock` defaults. Exception: dunder methods (e.g. `__repr__`, `__str__`) delegate to the internal Mock when not explicitly registered via `expect()`. The DSL names `expect`, `property`, and `verify` are reserved on `DeclarativeMock`; constructing a mock whose spec defines any of these attributes raises `ConfigurationError` immediately.
-3. **Explicit beats implicit** - an expectation without arguments means "called with no arguments", not "any arguments". To accept arbitrary values, matchers such as `Anything` / `Anything()`, or variadic wildcards `ANY_ARGS` / `ANY_KWARGS`, must be used explicitly.
-4. **Positional vs keyword** - matching distinguishes positional-only, keyword-only, and mixed call shapes as in Python: the same value passed positionally vs by keyword is not interchangeable unless the DSL explicitly allows it.
-5. **Sync and async** - async methods on the spec are detected automatically. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction` is true on every supported Python. The same DSL (`returns`, `raises`, `runs`, quantifiers) applies to both sync and async methods. `runs()` accepts a sync callable or an `async def`; when the spec method is async, an awaitable result is awaited.
+1. **Order matters (per-name)** - interactions (expectations or observations) for the same attribute name are consumed in the order they were registered. Interactions for different method names are independent and may be called in any order unless linked with `not_before` / `in_order` or chained `.expect()` / `.observe()`.
+2. **Whitelist proxy (`DeclarativeMock`)** - any call to a spec method without a prior `expect()` registration raises `UnexpectedCallError`. The mock is strict by default; regular methods do not fall through to `unittest.mock` defaults. Exception: dunder methods (e.g. `__repr__`, `__str__`) delegate to the internal Mock when not explicitly registered via `expect()`. The DSL names `expect`, `property`, and `verify` are reserved on `DeclarativeMock`; constructing a mock whose spec defines any of these attributes raises `ConfigurationError` immediately.
+3. **Pass-through spy (`DeclarativeSpy`)** - wraps a live object instance (passing a class/type raises `ConfigurationError`). Unhooked attributes and methods delegate directly to the wrapped object. Methods registered via `observe()` still execute on the real object, while their arguments, ordering, call counts, and return values or raised exceptions are checked against the declared observations. A call to a hooked method whose arguments match no non-exhausted observation raises `UnexpectedCallError`. The DSL names `observe` and `verify` are reserved on `DeclarativeSpy`; wrapping an object that defines either raises `ConfigurationError` immediately.
+4. **Explicit beats implicit** - an expectation or observation without arguments means "called with no arguments", not "any arguments". To accept arbitrary values, matchers such as `Anything` / `Anything()`, or variadic wildcards `ANY_ARGS` / `ANY_KWARGS`, must be used explicitly.
+5. **Positional vs keyword** - matching distinguishes positional-only, keyword-only, and mixed call shapes as in Python: the same value passed positionally vs by keyword is not interchangeable unless the DSL explicitly allows it.
+6. **Sync and async** - async methods on the spec or wrapped object are detected automatically. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction` is true on every supported Python. The same DSL (`returns`, `raises`, `runs`, `condition`, quantifiers) applies to both sync and async methods. On `DeclarativeMock`, `runs()` accepts a sync callable or an `async def`; when the spec method is async, an awaitable result is awaited.
 
-## Expectation registration
+## Expectation and observation registration
 
-- `expect(name, …)` registers an expectation for an attribute on the mock. `name` is a string or the unbound method or property from the spec class (`Service.fetch`). A string does not select argument or outcome types. A method or property lets a type checker check the expected arguments and the chained outcomes against that attribute. At runtime both forms only check that the attribute exists on the spec.
+- `expect(name, …)` registers an expectation for an attribute on `DeclarativeMock`. `name` is a string or the unbound method or property from the spec class (`Service.fetch`). A string does not select argument or outcome types. A method or property lets a type checker check the expected arguments and the chained outcomes against that attribute. At runtime both forms only check that the attribute exists on the spec.
+- `observe(name, …)` registers an observation for a callable attribute on `DeclarativeSpy`. `name` is a string or an unbound method/callable from the wrapped object's class. Registering an observation for a non-callable attribute raises `ConfigurationError`.
+- Chaining `.expect(name, …)` on an `Expectation` or `.observe(name, …)` on an `Observation` registers a follow-up interaction on the parent mock/spy and automatically applies `.not_before(self)`.
 - Arguments after the name describe **expected** call arguments (positional and keyword), possibly using matchers.
-- Multiple `returns(…)`, `raises(…)`, or `runs(…)` on one expectation define a **sequence** of outcomes for successive matching calls. Order of chained outcomes matters. `.runs(fn).returns(value)` is two calls, not a side effect plus a return on the same call. Each of those methods takes a keyword-only `repeat` (default 1). `repeat=n` appends that same outcome `n` times, which is the same sequence as chaining the call `n` times. `repeat` less than 1 raises `ConfigurationError`.
+- Multiple `returns(…)`, `raises(…)`, `runs(…)`, or `condition(…)` on one interaction define a **sequence** of outcomes/checks for successive matching calls. Order of chained outcomes matters. On `DeclarativeMock`, `.runs(fn).returns(value)` is two calls, not a side effect plus a return on the same call. Each of those methods takes a keyword-only `repeat` (default 1). `repeat=n` appends that same outcome `n` times, which is the same sequence as chaining the call `n` times. `repeat` less than 1 raises `ConfigurationError`.
 
 ## Quantifiers and call counts
 
@@ -35,10 +38,21 @@ When the quantifier allows more calls than there are outcomes, the **last** outc
 
 ## Outcomes
 
+### Mock outcomes (`Expectation`)
+
 - **returns(value, \*, repeat=1)** - return a single Python value for a matching call. Tuples are returned as tuples; no unpacking is performed. `repeat` appends this outcome that many times.
 - **raises(exc, \*, repeat=1)** - raise an exception instance or type. If a type is passed, it is instantiated with no arguments before raising. `repeat` appends this outcome that many times.
 - **runs(func, \*, repeat=1)** - call `func(*args, **kwargs)` with the actual call arguments; the return value of `func` becomes the call result. `repeat` appends this outcome that many times.
 - **No explicit outcome** - delegates to the internal `unittest.mock.Mock` child (returns a `Mock` object).
+
+### Spy observation checks (`Observation`)
+
+`DeclarativeSpy` executes the real method first, then checks the observed return value or raised exception against the next slot:
+
+- **returns(value, \*, condition=None, repeat=1)** - asserts that the real call returned a value equal to `value` (`actual == value`) and, if `condition` is given, that `condition(actual)` returns truthy. Raises `DeclarativeMockError` on mismatch; otherwise returns the real value.
+- **raises(exc, \*, condition=None, repeat=1)** - asserts that the real call raised `exc` (checked with `isinstance` for a type, or matching type and `str(actual) == str(exc)` for an instance) and, if `condition` is given, that `condition(actual)` returns truthy. Raises `DeclarativeMockError` on mismatch; otherwise re-raises the original exception.
+- **condition(func, \*, repeat=1)** - calls `func(result)` with the real return value or raised exception and asserts it returns truthy. Raises `DeclarativeMockError` if falsy; otherwise returns the real value or re-raises the original exception.
+- **No explicit check** - records the call and counts toward the quantifier without checking the return value or exception.
 
 ## Property stubs
 
@@ -49,8 +63,8 @@ When the quantifier allows more calls than there are outcomes, the **last** outc
 
 ## Verification
 
-- **verify()** performs a final pass: all registered expectations must be satisfied (call counts as specified). Raises `UnsatisfiedExpectationError` listing every unsatisfied expectation with expected vs actual call counts. Diagnostic text does not change matching or dispatch rules.
-- Under pytest, the installed plugin calls `verify()` on every mock created during the test when the test call finishes. An unsatisfied expectation fails that test. An exception the test already raised stays the failure. Mocks created while fixtures are finalizing are verified afterward; that failure is reported on teardown and does not affect the next test. Other runners do not call `verify()` for you.
+- **verify()** performs a final pass: all registered interactions must be satisfied (call counts as specified). `DeclarativeMock.verify()` raises `UnsatisfiedExpectationError` and `DeclarativeSpy.verify()` raises `UnsatisfiedObservationError`, listing every unsatisfied interaction with expected vs actual call counts. Diagnostic text does not change matching or dispatch rules.
+- Under pytest, the installed plugin calls `verify()` on every mock and spy created during the test when the test call finishes. An unsatisfied expectation or observation fails that test. An exception the test already raised stays the failure. Mocks and spies created while fixtures are finalizing are verified afterward; that failure is reported on teardown and does not affect the next test. Other runners do not call `verify()` for you.
 
 ## Exhaustion
 
@@ -78,12 +92,12 @@ Until the quantifier is exhausted, leftover calls reuse the last outcome.
 
 Dependencies are a **dispatch-time guard only** and do not add new criteria to `verify()`. Unsatisfied prerequisites at the end of the test are caught by `verify()` through the normal quantifier check, not through dependency tracking.
 
-Cross-mock dependencies (prerequisites on a different `DeclarativeMock` instance) are supported.
+Cross-mock and cross-spy dependencies (prerequisites on a different `DeclarativeMock` or `DeclarativeSpy` instance) are supported.
 
 ## Non-goals
 
-- No signature binding at runtime: `expect` checks that the attribute exists on the spec, not that the argument list matches the real signature. When `name` is a method or property object, type checkers check arguments and outcomes statically.
+- No signature binding at runtime: `expect` and `observe` check that the attribute exists on the spec or object, not that the argument list matches the real signature. When `name` is a method or property object, type checkers check arguments and outcomes statically.
 - No automatic `verify()` outside pytest. Other runners still need an explicit `verify()`.
-- No spies and no patching of live objects, modules, or `sys.modules`.
+- No patching of modules or `sys.modules` (spies wrap explicit object instances via `DeclarativeSpy`).
 - Not thread-safe.
 - Exact class names and internal algorithms.

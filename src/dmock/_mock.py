@@ -2,17 +2,10 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, assert_never, final, overload
+from typing import TYPE_CHECKING, Generic, final, overload
 from unittest.mock import AsyncMock, Mock
 
-from dmock._exceptions import (
-    BlockedCallError,
-    ConfigurationError,
-    NoMatchingCallError,
-    UnregisteredCallError,
-    UnsatisfiedExpectationError,
-)
-from dmock._expectation import Expectation
+from dmock._interaction import Interaction, Mediator
 from dmock._protocols import T
 from dmock._registry import MockRegistry
 from dmock._types import (
@@ -22,18 +15,26 @@ from dmock._types import (
     ReturnOutcome,
     RunOutcome,
 )
+from dmock.exceptions._exceptions import (
+    BlockedCallError,
+    ConfigurationError,
+    NoMatchingCallError,
+    UnregisteredCallError,
+    UnsatisfiedExpectationError,
+)
 
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
     from typing import Any, Concatenate
 
-    from dmock._matchers import (
+    from dmock._interaction import Expectation, Observation
+    from dmock._protocols import ClassOf, P, PropertyOf, R
+    from dmock._types import Outcome
+    from dmock.matchers._matchers import (
         _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
         _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
     )
-    from dmock._protocols import ClassOf, P, PropertyOf, R
-    from dmock._types import Outcome
 
     class _Base(Any):  # type: ignore[misc]
         pass
@@ -45,12 +46,29 @@ else:
 
 
 @dataclass(frozen=True, slots=True)
-class _ExpectationLookup:
-    matched: Expectation[..., object] | None
-    rejected: tuple[Expectation[..., object], ...]
+class _ExpectationLookup(Generic[T]):
+    matched: Expectation[T, ..., object] | None
+    rejected: tuple[Expectation[T, ..., object], ...]
 
 
 _RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"})
+
+
+class MockMediator(Generic[T], Mediator[T]):
+    """Mediator that registers chained expectations on a :class:`DeclarativeMock`."""
+
+    def __init__(self, mock: DeclarativeMock[T]) -> None:
+        self._mock = mock
+
+    def mediate(
+        self,
+        name: str | Callable[..., object],
+        /,
+        *args: object,
+        **kwargs: object,
+    ) -> Expectation[T, Any, Any] | Observation[T, Any, Any]:
+        """Forward a chained ``expect`` call to the underlying mock."""
+        return self._mock.expect(name, *args, **kwargs)
 
 
 @final
@@ -69,13 +87,27 @@ class DeclarativeMock(Generic[T], _Base):
 
     Examples:
         >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import AnythingOfType
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
+        ...     def close(self) -> None: ...
         >>> mock = DeclarativeMock(Service)
         >>> mock.expect("fetch", "a").returns("A").once()
         Expectation(fetch('a'))
         >>> mock.fetch("a")
         'A'
+        >>> (
+        ...     mock.expect(Service.fetch, AnythingOfType(str))
+        ...     .returns("B")
+        ...     .once()
+        ...     .expect(Service.close)
+        ...     .returns(None)
+        ...     .once()
+        ... )
+        Expectation(close())
+        >>> mock.fetch("b")
+        'B'
+        >>> mock.close()
         >>> mock.verify()
         >>> mock
         DeclarativeMock(spec=Service)
@@ -102,7 +134,7 @@ class DeclarativeMock(Generic[T], _Base):
                 "Rename those attributes on the spec, or wrap a protocol without them."
             )
 
-        self.__expectations: list[Expectation[..., object]] = []
+        self.__expectations: list[Expectation[T, ..., object]] = []
         self.__hooked: set[str] = set()
         self.__properties: dict[str, object] = {}
         self.__calls: list[RecordedCall] = []
@@ -117,7 +149,7 @@ class DeclarativeMock(Generic[T], _Base):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -127,7 +159,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -137,7 +169,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -146,7 +178,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -155,7 +187,7 @@ class DeclarativeMock(Generic[T], _Base):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -165,7 +197,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -175,7 +207,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -184,7 +216,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: P.args,
         **kwargs: P.kwargs,
-    ) -> Expectation[P, R]: ...
+    ) -> Expectation[T, P, R]: ...
 
     @overload
     def expect(
@@ -193,7 +225,7 @@ class DeclarativeMock(Generic[T], _Base):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[..., object]: ...
+    ) -> Expectation[T, ..., Any]: ...
 
     def expect(
         self,
@@ -242,7 +274,9 @@ class DeclarativeMock(Generic[T], _Base):
                 "a property stub is already registered for this name."
             )
 
-        exp: Expectation[..., object] = Expectation(resolved, args, kwargs)
+        exp: Expectation[T, ..., object] = Interaction[T, ..., object].expectation(
+            MockMediator(self), resolved, args, kwargs
+        )
         self.__expectations.append(exp)
         self.__hooked.add(resolved)
         return exp
@@ -298,7 +332,8 @@ class DeclarativeMock(Generic[T], _Base):
                 and includes the call history when any calls were dispatched.
 
         Examples:
-            >>> from dmock import DeclarativeMock, UnsatisfiedExpectationError
+            >>> from dmock import DeclarativeMock
+            >>> from dmock.exceptions import UnsatisfiedExpectationError
             >>> class Service:
             ...     def fetch(self, key: str) -> str: ...
             >>> mock = DeclarativeMock(Service)
@@ -368,7 +403,7 @@ class DeclarativeMock(Generic[T], _Base):
         name: str,
         args: tuple[object, ...],
         kwargs: dict[str, object],
-    ) -> _ExpectationLookup:
+    ) -> _ExpectationLookup[T]:
         candidates = tuple(e for e in self.__expectations if e.method_name == name)
         for exp in candidates:
             if not exp.is_exhausted() and exp.matches(args, kwargs):
@@ -394,7 +429,9 @@ class DeclarativeMock(Generic[T], _Base):
             case DefaultOutcome():
                 return getattr(self.__mock, name)(*args, **kwargs)
             case _:
-                assert_never(outcome)
+                raise AssertionError(
+                    f"Expected code to be unreachable, but got: {outcome}"
+                )
 
     def __spec_attribute_name(self, name: object) -> str:
         """Return the spec attribute name for a string, property, or callable."""
@@ -430,4 +467,26 @@ def dmock(spec: type[T], /, **kwargs: object) -> DeclarativeMock[T]: ...
 @overload
 def dmock(spec: ClassOf[T], /, **kwargs: object) -> DeclarativeMock[T]: ...
 def dmock(spec: type[T] | ClassOf[T], /, **kwargs: object) -> DeclarativeMock[T]:
+    """Create a :class:`DeclarativeMock` for `spec`.
+
+    Convenience factory equivalent to ``DeclarativeMock(spec, **kwargs)``.
+
+    Args:
+        spec: Class or protocol whose attributes are allowed. Positional-only.
+        **kwargs: Forwarded to ``unittest.mock.Mock``.
+
+    Returns:
+        A new :class:`DeclarativeMock` bound to `spec`.
+
+    Examples:
+        >>> from dmock import dmock
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str: ...
+        >>> mock = dmock(Service)
+        >>> mock.expect("fetch", "a").returns("A").once()
+        Expectation(fetch('a'))
+        >>> mock.fetch("a")
+        'A'
+        >>> mock.verify()
+    """
     return DeclarativeMock(spec, **kwargs)
