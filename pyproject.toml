@@ -1,27 +1,13 @@
 [project]
 name = "declarative-mocks"
 version = "0.5.0"
-description = "Declare mock expectations and spy observations in a typed, gomock-inspired DSL over unittest.mock"
+description = "Declare mock behavior as ordered expectations. Simple, typed, gomock-inspired DSL over unittest.mock"
 authors = [{ name = "Dimitry Churilov", email = "d.mdx3r@gmail.com" }]
 license = "MIT"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.11"
-keywords = [
-    "mock",
-    "mocking",
-    "spy",
-    "spies",
-    "spying",
-    "stub",
-    "stubbing",
-    "testing",
-    "unittest",
-    "pytest",
-    "expectations",
-    "matchers",
-    "typed",
-]
+keywords = ["mock", "mocking", "spying", "testing", "unittest", "pytest"]
 classifiers = [
     "Framework :: Pytest",
     "Intended Audience :: Developers",
