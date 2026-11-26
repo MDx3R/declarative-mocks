@@ -221,16 +221,58 @@ assert bus.publish(
 bus.verify()
 ```
 
-**dmock** is built on `unittest.mock`, has zero runtime dependencies, and doesn't patch anything. Unregistered calls fail immediately. Nothing on live modules or instances is rewritten.
+**dmock** also supports pass-through spies, composable predicates and chained `.expect(...)` / `.observe(...)` ordering:
+
+```python
+from dmock import DeclarativeSpy
+from dmock.checks import Check
+
+class Store:
+    def __init__(self) -> None:
+        self.items: dict[str, str] = {}
+        self.dirty = False
+
+    def save(self, key: str, value: str) -> bool:
+        self.items[key] = value
+        self.dirty = False
+        return True
+
+    def fetch(self, key: str) -> str:
+        return self.items[key]
+
+store = Store()
+spy = DeclarativeSpy(store)
+
+_ = (
+    spy.observe(Store.save, "a", "A")
+    .returns(
+        True,
+        condition=Check[bool](
+            lambda _: store.items.get("a") == "A",
+            lambda _: not store.dirty,
+        ),
+    )
+    .once()
+    .observe(Store.fetch, "a")
+    .returns("A")
+    .once()
+)
+
+assert spy.save("a", "A") is True
+assert spy.fetch("a") == "A"
+spy.verify()
+```
+
+**dmock** is built on `unittest.mock`, has zero runtime dependencies, and doesn't patch anything. Unregistered mock calls fail immediately. Nothing on live modules or instances is rewritten.
 
 Look up the dmock source code and tests yourself, it's full of examples!
 
 ## Limitations & non-goals
 
-- **No signature binding at runtime.** `expect("method", …)` checks that `method` exists on the spec, not that the argument list matches the real signature at runtime.
-- **No automatic** `verify()` **outside pytest.** The pytest plugin checks every mock when the test finishes. Other runners still need an explicit `verify()`.
-- **No spies and no patching.** The library does not wrap live objects, modules, or `sys.modules`. Just construct a `DeclarativeMock` and pass it in.
-- **Not thread-safe.** Concurrent use of one mock from multiple threads is out of scope.
+- **No signature binding at runtime.** `expect("method", …)` and `observe("method", …)` check that `method` exists on the spec or object, not that the argument list matches the real signature at runtime.
+- **No automatic** `verify()` **outside pytest.** The pytest plugin checks every mock and spy when the test finishes. Other runners still need an explicit `verify()`.
+- **No global patching.** The library does not patch modules or instances. Construct a `DeclarativeMock` or wrap a live instance with `DeclarativeSpy` and pass it in.
+- **Not thread-safe.** Concurrent use of one mock or spy from multiple threads is out of scope.
 
 ## Roadmap
 

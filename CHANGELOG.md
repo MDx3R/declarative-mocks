@@ -2,8 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.5.0] - 2026-11-26
 
+- **Breaking**: Split the public API into `dmock` (`DeclarativeMock`, `DeclarativeSpy`, `Expectation`, `Observation`, `dmock`, `dspy`, `in_order`), `dmock.checks` (`Check`, `CheckAnd`, `CheckNot`, `CheckOr`), `dmock.matchers` (`Matcher`, `ANY_ARGS`, `ANY_KWARGS`, and all matchers), and `dmock.exceptions` (`DeclarativeMockError`, `UnexpectedCallError`, `UnsatisfiedExpectationError`, `UnsatisfiedObservationError`, `ConfigurationError`).
+- Add `DeclarativeSpy` and `dspy(obj)` to wrap live object instances, pass through unhooked attributes and methods, and observe hooked sync or async calls via `.observe()` and `.verify()` (with automatic pytest verification).
+- Add `Observation` outcome checks: `.returns(value, *, condition=None, repeat=1)`, `.raises(exc, *, condition=None, repeat=1)`, and `.condition(func, *, repeat=1)`, plus quantifiers, `.maybe()`, `.not_before()`, `in_order()`, and `UnsatisfiedObservationError`.
+- Add `dmock.checks` (`Check`, `CheckNot`, `CheckAnd`, `CheckOr`) with `~`, `&`, and `|` operators for composing predicate checks.
+- Add chained interactions: `Expectation.expect(...)` and `Observation.observe(...)` register a follow-up interaction ordered with `.not_before(self)`.
 - `Attr` accepts several attribute names and matches only when the object has every one.
 - `Namespace` matches an object whose slots and instance attributes are exactly the given attributes. Class attributes and properties do not count.
 - `PartialNamespace` matches an object that has the given slots and instance attributes. Class attributes and properties do not count. Extra attributes are ignored.
