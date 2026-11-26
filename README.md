@@ -139,7 +139,9 @@ mock = DeclarativeMock(MyService)
 mock.expect(MyService.aprocess_order, Anything()).returns("ok")
 assert await mock.aprocess_order(1) == "ok"
 
-mock.expect(MyService.aprocess_order, Anything()).runs(lambda order_id: f"sync-{order_id}")
+mock.expect(MyService.aprocess_order, Anything()).runs(
+    lambda order_id: f"sync-{order_id}"
+)
 assert await mock.aprocess_order(7) == "sync-7"
 
 async def async_fn(order_id: int) -> str:
@@ -152,6 +154,7 @@ assert await mock.aprocess_order(9) == "async-9"
 The matcher set is rich enough that even the most complicated call stays as **one declarative expectation**. Prefixes, partial mappings, lengths, order, and formats compose in place:
 
 ```python
+from typing import Any
 from dmock import (
     AnyOrder,
     DeclarativeMock,
@@ -164,7 +167,9 @@ from dmock import (
 )
 
 class EventBus:
-    def publish(self, *, topic: str, headers: dict, payload: dict) -> bool: ...
+    def publish(
+        self, *, topic: str, headers: dict[str, Any], payload: dict[str, Any]
+    ) -> bool: ...
 
 bus = DeclarativeMock(EventBus)
 bus.expect(
@@ -179,12 +184,14 @@ bus.expect(
     payload=PartialMapping(
         {
             "order_id": GreaterThan(0),
-            "items": HasLen(GreaterThan(0))
-            & AnyOrder(
-                [
-                    PartialMapping({"sku": "SKU-AAA", "qty": 1}),
-                    PartialMapping({"sku": "SKU-BBB", "qty": 2}),
-                ]
+            "items": (
+                HasLen(GreaterThan(0))
+                & AnyOrder(
+                    [
+                        PartialMapping({"sku": "SKU-AAA", "qty": 1}),
+                        PartialMapping({"sku": "SKU-BBB", "qty": 2}),
+                    ]
+                )
             ),
         }
     ),
