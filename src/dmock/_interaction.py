@@ -195,7 +195,7 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def returns(self, value: R, *, repeat: int = 1) -> Self:
+    def returns(self, value: R, /, *, repeat: int = 1) -> Self:
         """Declare the return value for the next matching call.
 
         Args:
@@ -227,6 +227,7 @@ class Expectation(ABC, Generic[T, P, R]):
     def raises(
         self,
         exc: BaseException | type[BaseException],
+        /,
         *,
         repeat: int = 1,
     ) -> Self:
@@ -257,13 +258,13 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @overload
-    def runs(self, func: Callable[P, R], *, repeat: int = 1) -> Self: ...
+    def runs(self, func: Callable[P, R], /, *, repeat: int = 1) -> Self: ...
 
     @overload
-    def runs(self, func: Callable[P, Awaitable[R]], *, repeat: int = 1) -> Self: ...
+    def runs(self, func: Callable[P, Awaitable[R]], /, *, repeat: int = 1) -> Self: ...
 
     @abstractmethod
-    def runs(self, func: Callable[P, R | Awaitable[R]], *, repeat: int = 1) -> Self:
+    def runs(self, func: Callable[P, R | Awaitable[R]], /, *, repeat: int = 1) -> Self:
         """Call `func` with the actual arguments for the next matching call.
 
         The return value of `func` becomes the result of that call. Chaining
@@ -345,7 +346,7 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def times(self, n: int) -> Self:
+    def times(self, n: int, /) -> Self:
         """Require exactly `n` matching calls.
 
         Args:
@@ -370,7 +371,7 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def at_least(self, n: int) -> Self:
+    def at_least(self, n: int, /) -> Self:
         """Require at least `n` matching calls, with no upper bound.
 
         Args:
@@ -395,7 +396,7 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def at_most(self, n: int) -> Self:
+    def at_most(self, n: int, /) -> Self:
         """Allow between 0 and `n` matching calls, inclusive.
 
         Args:
@@ -418,7 +419,7 @@ class Expectation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def between(self, lo: int, hi: int) -> Self:
+    def between(self, lo: int, hi: int, /) -> Self:
         """Require between `lo` and `hi` matching calls, inclusive.
 
         Args:
@@ -757,6 +758,7 @@ class Observation(ABC, Generic[T, P, R]):
     def returns(
         self,
         value: R,
+        /,
         *,
         condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
@@ -814,6 +816,7 @@ class Observation(ABC, Generic[T, P, R]):
     def raises(
         self,
         exc: E,
+        /,
         *,
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
@@ -822,6 +825,7 @@ class Observation(ABC, Generic[T, P, R]):
     def raises(
         self,
         exc: type[E],
+        /,
         *,
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
@@ -830,6 +834,7 @@ class Observation(ABC, Generic[T, P, R]):
     def raises(
         self,
         exc: E | type[E],
+        /,
         *,
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
@@ -871,7 +876,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def condition(self, func: Callable[[Any], bool], *, repeat: int = 1) -> Self:
+    def condition(self, func: Callable[[Any], bool], /, *, repeat: int = 1) -> Self:
         """Assert that `func` returns ``True`` for the next matching call's outcome.
 
         `func` receives either the return value or the raised exception from
@@ -974,7 +979,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def times(self, n: int) -> Self:
+    def times(self, n: int, /) -> Self:
         """Require exactly `n` matching calls.
 
         Args:
@@ -1000,7 +1005,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def at_least(self, n: int) -> Self:
+    def at_least(self, n: int, /) -> Self:
         """Require at least `n` matching calls, with no upper bound.
 
         Args:
@@ -1026,7 +1031,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def at_most(self, n: int) -> Self:
+    def at_most(self, n: int, /) -> Self:
         """Allow between 0 and `n` matching calls, inclusive.
 
         Args:
@@ -1050,7 +1055,7 @@ class Observation(ABC, Generic[T, P, R]):
         ...
 
     @abstractmethod
-    def between(self, lo: int, hi: int) -> Self:
+    def between(self, lo: int, hi: int, /) -> Self:
         """Require between `lo` and `hi` matching calls, inclusive.
 
         Args:
@@ -1490,6 +1495,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def returns(
         self,
         value: R,
+        /,
         *,
         condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
@@ -1505,6 +1511,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def raises(
         self,
         exc: E,
+        /,
         *,
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
@@ -1513,6 +1520,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def raises(
         self,
         exc: type[E],
+        /,
         *,
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
@@ -1521,12 +1529,14 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def raises(
         self,
         exc: BaseException | type[BaseException],
+        /,
         *,
         repeat: int = 1,
     ) -> Self: ...
     def raises(
         self,
         exc: BaseException | type[BaseException],
+        /,
         *,
         condition: Callable[[Any], bool] | None = None,
         repeat: int = 1,
@@ -1539,16 +1549,16 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         return self
 
     @overload
-    def runs(self, func: Callable[P, R], *, repeat: int = 1) -> Self: ...
+    def runs(self, func: Callable[P, R], /, *, repeat: int = 1) -> Self: ...
 
     @overload
-    def runs(self, func: Callable[P, Awaitable[R]], *, repeat: int = 1) -> Self: ...
+    def runs(self, func: Callable[P, Awaitable[R]], /, *, repeat: int = 1) -> Self: ...
 
-    def runs(self, func: Callable[P, R | Awaitable[R]], *, repeat: int = 1) -> Self:
+    def runs(self, func: Callable[P, R | Awaitable[R]], /, *, repeat: int = 1) -> Self:
         self._append_outcome(RunOutcome(func), repeat)
         return self
 
-    def condition(self, func: Callable[[Any], bool], *, repeat: int = 1) -> Self:
+    def condition(self, func: Callable[[Any], bool], /, *, repeat: int = 1) -> Self:
         self._append_outcome(ConditionCheck(func), repeat)
         return self
 
@@ -1572,16 +1582,16 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def twice(self) -> Self:
         return self._set_quantifier(ExactlyN(2))
 
-    def times(self, n: int) -> Self:
+    def times(self, n: int, /) -> Self:
         return self._set_quantifier(ExactlyN(n))
 
-    def at_least(self, n: int) -> Self:
+    def at_least(self, n: int, /) -> Self:
         return self._set_quantifier(AtLeast(n))
 
-    def at_most(self, n: int) -> Self:
+    def at_most(self, n: int, /) -> Self:
         return self._set_quantifier(Between(0, n))
 
-    def between(self, lo: int, hi: int) -> Self:
+    def between(self, lo: int, hi: int, /) -> Self:
         return self._set_quantifier(Between(lo, hi))
 
     def maybe(self) -> Self:

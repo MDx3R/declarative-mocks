@@ -5,6 +5,7 @@ All notable changes to this project are documented in this file.
 ## [0.5.0] - 2026-11-26
 
 - **Breaking**: Split the public API into `dmock` (`DeclarativeMock`, `DeclarativeSpy`, `Expectation`, `Observation`, `dmock`, `dspy`, `in_order`), `dmock.checks` (`Check`, `CheckAnd`, `CheckNot`, `CheckOr`), `dmock.matchers` (`Matcher`, `ANY_ARGS`, `ANY_KWARGS`, and all matchers), and `dmock.exceptions` (`DeclarativeMockError`, `UnexpectedCallError`, `UnsatisfiedExpectationError`, `UnsatisfiedObservationError`, `ConfigurationError`).
+- **Breaking**: Make public API parameters strictly positional-only (before `/`) or keyword-only (after `*`) on `Expectation` / `Observation` (`returns`, `raises`, `runs`, `condition`, `times`, `at_least`, `at_most`, `between`) and on `Approx`, `RegexMatch`, `RegexSearch`, and `RegexFullmatch`.
 - Add `DeclarativeSpy` and `dspy(obj)` to wrap live object instances, pass through unhooked attributes and methods, and observe hooked sync or async calls via `.observe()` and `.verify()` (with automatic pytest verification).
 - Add `Observation` outcome checks: `.returns(value, *, condition=None, repeat=1)`, `.raises(exc, *, condition=None, repeat=1)`, and `.condition(func, *, repeat=1)`, plus quantifiers, `.maybe()`, `.not_before()`, `in_order()`, and `UnsatisfiedObservationError`.
 - Add `dmock.checks` (`Check`, `CheckNot`, `CheckAnd`, `CheckOr`) with `~`, `&`, and `|` operators for composing predicate checks.

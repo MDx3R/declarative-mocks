@@ -1584,6 +1584,7 @@ class Approx(Matcher):
         self,
         expected: SupportsFloat,
         /,
+        *,
         rel_tol: SupportsFloat = 1e-9,
         abs_tol: SupportsFloat = 0,
     ) -> None:
@@ -1747,7 +1748,7 @@ class RegexMatch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, *, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
@@ -1789,7 +1790,7 @@ class RegexSearch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, *, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
@@ -1828,7 +1829,7 @@ class RegexFullmatch(Matcher):
     """
 
     def __init__(
-        self, expected: str | re.Pattern[str], /, flags: re.RegexFlag = re.NOFLAG
+        self, expected: str | re.Pattern[str], /, *, flags: re.RegexFlag = re.NOFLAG
     ) -> None:
         self._expected = expected
         self._flags = flags
