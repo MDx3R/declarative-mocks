@@ -775,3 +775,100 @@ class TestRepr:
 
     def test_contains_any_kwargs_sentinel(self) -> None:
         assert repr(make("f", ANY_KWARGS)) == "Interaction(f(ANY_KWARGS))"
+
+
+# ---------------------------------------------------------------------------
+# Spy checks, mediation, and diamond dependencies
+# ---------------------------------------------------------------------------
+
+
+class TestSpyChecksAndMediation:
+    def test_returns_with_condition_produces_return_check(self) -> None:
+        # Arrange
+        def cond(v: object) -> bool:
+            return v == "ok"
+
+        obs = make("f").returns("ok", condition=cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == ReturnCheck("ok", cond)
+
+    def test_raises_with_condition_produces_raise_check(self) -> None:
+        # Arrange
+        def cond(exc: object) -> bool:
+            return isinstance(exc, ValueError)
+
+        obs = make("f").raises(ValueError, condition=cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == RaiseCheck(ValueError, cond)
+
+    def test_condition_produces_condition_check(self) -> None:
+        # Arrange
+        def cond(v: object) -> bool:
+            return v is not None
+
+        obs = make("f").condition(cond)
+
+        # Act
+        outcome = obs.consume()
+
+        # Assert
+        assert outcome == ConditionCheck(cond)
+
+    def test_chained_expect_and_observe_mediate_and_link_not_before(self) -> None:
+        # Arrange
+        recorded: list[
+            tuple[str | Callable[..., object], tuple[object, ...], dict[str, object]]
+        ] = []
+
+        class RecordingMediator(Mediator[Any]):
+            def mediate(
+                self,
+                name: str | Callable[..., object],
+                /,
+                *args: object,
+                **kwargs: object,
+            ) -> Expectation[Any, Any, Any] | Observation[Any, Any, Any]:
+                recorded.append((name, args, dict(kwargs)))
+                return Interaction(self, "Interaction", str(name), args, dict(kwargs))
+
+        med = RecordingMediator()
+        first: Interaction[Any, Any, Any] = Interaction(
+            med, "Expectation", "start", (), {}
+        )
+
+        # Act
+        second = first.expect("step", 1, flag=True)
+        third = Interaction(med, "Observation", "step", (), {}).observe(
+            "finish", "x", mode="fast"
+        )
+
+        # Assert
+        assert recorded == [
+            ("step", (1,), {"flag": True}),
+            ("finish", ("x",), {"mode": "fast"}),
+        ]
+        assert list(second.requires) == [first]
+        assert third.requires[0].method_name == "step"
+
+    def test_diamond_dependency_graph_is_allowed(self) -> None:
+        # Arrange
+        root = make("root")
+        left = make("left").not_before(root)
+        right = make("right").not_before(root)
+        leaf = make("leaf")
+
+        # Act
+        leaf.not_before(left, right)
+
+        # Assert
+        assert list(leaf.requires) == [left, right]
+        with pytest.raises(ConfigurationError):
+            root.not_before(leaf)

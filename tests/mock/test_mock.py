@@ -1060,6 +1060,33 @@ class TestNotBefore:
         # Assert
         assert result == "b"
 
+    def test_chained_expect_forwards_args_and_enforces_order(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        (
+            mock.expect("do_something")
+            .returns("a")
+            .once()
+            .expect("process_order", 1)
+            .returns("b")
+            .once()
+            .expect("greet", name="ada")
+            .returns("hi")
+            .once()
+        )
+
+        # Act & Assert
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+        mock.do_something()
+        with pytest.raises(UnexpectedCallError, match="process_order"):
+            mock.greet(name="ada")
+
+        assert mock.process_order(1) == "b"
+        assert mock.greet(name="ada") == "hi"
+        mock.verify()
+
     def test_not_before_unsatisfied_raises(self) -> None:
         # Arrange
         mock = DeclarativeMock(MyService)
@@ -1309,3 +1336,30 @@ class TestInOrder:
 
         # Assert
         assert result == "b"
+
+    def test_chained_expect_forwards_args_and_enforces_order(self) -> None:
+        # Arrange
+        mock = DeclarativeMock(MyService)
+        (
+            mock.expect("do_something")
+            .returns("a")
+            .once()
+            .expect("process_order", 1)
+            .returns("b")
+            .once()
+            .expect("greet", name="ada")
+            .returns("hi")
+            .once()
+        )
+
+        # Act & Assert
+        with pytest.raises(UnexpectedCallError, match="do_something"):
+            mock.process_order(1)
+
+        mock.do_something()
+        with pytest.raises(UnexpectedCallError, match="process_order"):
+            mock.greet(name="ada")
+
+        assert mock.process_order(1) == "b"
+        assert mock.greet(name="ada") == "hi"
+        mock.verify()

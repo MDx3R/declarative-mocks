@@ -199,3 +199,33 @@ class TestPluginReportsTheTest:
                 "*Unsatisfied expectations*",
             ]
         )
+
+    def test_unmet_spy_observation_fails_and_does_not_leak(
+        self, pytester: pytest.Pytester
+    ) -> None:
+        # Arrange
+        pytester.makepyfile(
+            """
+            from dmock import DeclarativeSpy
+
+            class Billing:
+                def charge(self, amount: int) -> int:
+                    return amount
+
+            def test_unmet_spy() -> None:
+                billing = DeclarativeSpy(Billing())
+                billing.observe("charge", 10).returns(10).once()
+
+            def test_later_spy_is_independent() -> None:
+                billing = DeclarativeSpy(Billing())
+                billing.observe("charge", 5).returns(5).once()
+                assert billing.charge(5) == 5
+            """
+        )
+
+        # Act
+        result = pytester.runpytest()
+
+        # Assert
+        result.assert_outcomes(failed=1, passed=1)
+        result.stdout.fnmatch_lines(["*Unsatisfied observations*", "*charge*"])

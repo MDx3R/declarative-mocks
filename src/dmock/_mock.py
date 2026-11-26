@@ -55,6 +55,8 @@ _RESERVED_DSL_NAMES: frozenset[str] = frozenset({"expect", "property", "verify"}
 
 
 class MockMediator(Generic[T], Mediator[T]):
+    """Mediator that registers chained expectations on a :class:`DeclarativeMock`."""
+
     def __init__(self, mock: DeclarativeMock[T]) -> None:
         self._mock = mock
 
@@ -65,7 +67,8 @@ class MockMediator(Generic[T], Mediator[T]):
         *args: object,
         **kwargs: object,
     ) -> Expectation[T, Any, Any] | Observation[T, Any, Any]:
-        return self._mock.expect(name, args, kwargs)
+        """Forward a chained ``expect`` call to the underlying mock."""
+        return self._mock.expect(name, *args, **kwargs)
 
 
 @final
@@ -83,7 +86,7 @@ class DeclarativeMock(Generic[T], _Base):
         **kwargs: Forwarded to ``unittest.mock.Mock``.
 
     Examples:
-        >>> from dmock import DeclarativeMock
+        >>> from dmock import AnythingOfType, DeclarativeMock
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -91,6 +94,10 @@ class DeclarativeMock(Generic[T], _Base):
         Expectation(fetch('a'))
         >>> mock.fetch("a")
         'A'
+        >>> mock.expect(Service.fetch, AnythingOfType(str)).returns("B").once()
+        Expectation(fetch(AnythingOfType(str, exact=False)))
+        >>> mock.fetch("b")
+        'B'
         >>> mock.verify()
         >>> mock
         DeclarativeMock(spec=Service)
@@ -449,4 +456,26 @@ def dmock(spec: type[T], /, **kwargs: object) -> DeclarativeMock[T]: ...
 @overload
 def dmock(spec: ClassOf[T], /, **kwargs: object) -> DeclarativeMock[T]: ...
 def dmock(spec: type[T] | ClassOf[T], /, **kwargs: object) -> DeclarativeMock[T]:
+    """Create a :class:`DeclarativeMock` for `spec`.
+
+    Convenience factory equivalent to ``DeclarativeMock(spec, **kwargs)``.
+
+    Args:
+        spec: Class or protocol whose attributes are allowed. Positional-only.
+        **kwargs: Forwarded to ``unittest.mock.Mock``.
+
+    Returns:
+        A new :class:`DeclarativeMock` bound to `spec`.
+
+    Examples:
+        >>> from dmock import dmock
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str: ...
+        >>> mock = dmock(Service)
+        >>> mock.expect("fetch", "a").returns("A").once()
+        Expectation(fetch('a'))
+        >>> mock.fetch("a")
+        'A'
+        >>> mock.verify()
+    """
     return DeclarativeMock(spec, **kwargs)

@@ -1,4 +1,4 @@
-"""Tests for MockRegistry."""
+"""Tests for MockRegistry and SpyRegistry."""
 
 from __future__ import annotations
 
@@ -7,9 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from dmock._exceptions import UnsatisfiedExpectationError
+from dmock._exceptions import (
+    UnsatisfiedExpectationError,
+    UnsatisfiedObservationError,
+)
 from dmock._mock import DeclarativeMock
-from dmock._registry import MockRegistry
+from dmock._registry import MockRegistry, SpyRegistry
+from dmock._spy import DeclarativeSpy
 
 
 class _Service(ABC):
@@ -148,3 +152,141 @@ class TestMockRegistryObservations:
 
         # Assert
         assert MockRegistry().mocks == []
+
+
+class _LiveService:
+    def do_something(self) -> str:
+        return "ok"
+
+
+class TestSpyRegistry:
+    def test_init_registers_the_spy(self) -> None:
+        # Arrange
+        svc = _LiveService()
+
+        # Act
+        spy = DeclarativeSpy(svc)
+
+        # Assert
+        assert SpyRegistry().spies == [spy]
+
+    def test_add_appends_the_spy(self) -> None:
+        # Arrange
+        spy = DeclarativeSpy(_LiveService())
+
+        # Act
+        SpyRegistry.add(spy)
+
+        # Assert
+        assert SpyRegistry().spies == [spy, spy]
+
+    def test_clear_drops_spies_without_verifying(self) -> None:
+        # Arrange
+        _ = DeclarativeSpy(_LiveService())
+
+        # Act
+        SpyRegistry.clear()
+
+        # Assert
+        assert SpyRegistry().spies == []
+
+    def test_verify_is_still_callable_manually(self) -> None:
+        # Arrange
+        spy = DeclarativeSpy(_LiveService())
+        spy.observe("do_something").returns("ok").once()
+        spy.do_something()
+
+        # Act
+        spy.verify()
+
+        # Assert
+        assert spy in SpyRegistry().spies
+
+    def test_manual_verify_still_raises_when_unmet(self) -> None:
+        # Arrange
+        spy = DeclarativeSpy(_LiveService())
+        spy.observe("do_something").returns("ok").once()
+
+        # Act & Assert
+        with pytest.raises(UnsatisfiedObservationError):
+            spy.verify()
+
+    def test_teardown_verifies_and_clears(self) -> None:
+        # Arrange
+        spy = DeclarativeSpy(_LiveService())
+        spy.observe("do_something").returns("ok").once()
+        spy.do_something()
+
+        # Act
+        SpyRegistry.teardown()
+
+        # Assert
+        assert SpyRegistry().spies == []
+
+    def test_second_teardown_is_a_noop(self) -> None:
+        # Arrange
+        SpyRegistry.teardown()
+
+        # Act
+        SpyRegistry.teardown()
+
+        # Assert
+        assert SpyRegistry().spies == []
+
+
+class TestSpyRegistryObservations:
+    def test_teardown_clears_before_verify_and_stops_on_error(self) -> None:
+        # Arrange
+        first = DeclarativeSpy(_LiveService())
+        second = DeclarativeSpy(_LiveService())
+        first.observe("do_something").returns("ok").once()
+        second.observe("do_something").returns("ok").once()
+        observed_sizes: list[int] = []
+        verified: list[int] = []
+
+        def observe_verify(self: DeclarativeSpy[_LiveService]) -> None:
+            observed_sizes.append(len(SpyRegistry().spies))
+            verified.append(id(self))
+            raise UnsatisfiedObservationError((), ())
+
+        # Act & Assert
+        with (
+            patch.object(DeclarativeSpy, "verify", observe_verify),
+            pytest.raises(UnsatisfiedObservationError),
+        ):
+            SpyRegistry.teardown()
+
+        assert observed_sizes == [0]
+        assert verified == [id(first)]
+        assert SpyRegistry().spies == []
+
+    def test_spy_created_during_verify_is_outside_the_snapshot(self) -> None:
+        # Arrange
+        original = DeclarativeSpy(_LiveService())
+        original.observe("do_something").returns("ok").once()
+        seen: list[tuple[object, ...]] = []
+        created: list[DeclarativeSpy[_LiveService]] = []
+
+        def observe_verify(spy: DeclarativeSpy[_LiveService]) -> None:
+            seen.append(tuple(SpyRegistry().spies))
+            created.append(DeclarativeSpy(_LiveService()))
+            assert spy is original
+            raise UnsatisfiedObservationError((), ())
+
+        # Act
+        with (
+            patch.object(DeclarativeSpy, "verify", observe_verify),
+            pytest.raises(UnsatisfiedObservationError),
+        ):
+            SpyRegistry.teardown()
+
+        # Assert
+        assert seen == [()]
+        assert original not in SpyRegistry().spies
+        assert SpyRegistry().spies == created
+
+        # Act
+        SpyRegistry.teardown()
+
+        # Assert
+        assert SpyRegistry().spies == []

@@ -59,6 +59,8 @@ _RESERVED_DSL_NAMES: frozenset[str] = frozenset({"observe", "verify"})
 
 
 class SpyMediator(Generic[T], Mediator[T]):
+    """Mediator that registers chained observations on a :class:`DeclarativeSpy`."""
+
     def __init__(self, mock: DeclarativeSpy[T]) -> None:
         self._mock = mock
 
@@ -69,11 +71,48 @@ class SpyMediator(Generic[T], Mediator[T]):
         *args: object,
         **kwargs: object,
     ) -> Expectation[T, Any, Any] | Observation[T, Any, Any]:
-        return self._mock.observe(name, args, kwargs)
+        """Forward a chained ``observe`` call to the underlying spy."""
+        return self._mock.observe(name, *args, **kwargs)
 
 
 @final
 class DeclarativeSpy(Generic[T], _Base):
+    """Pass-through spy proxy over a live object with an observation DSL.
+
+    Unhooked attributes and methods delegate directly to the wrapped object.
+    Methods registered via :meth:`observe` still execute on the real object,
+    while their arguments, call counts, ordering, and results or exceptions are
+    checked against the declared expectations.
+
+    The names ``observe`` and ``verify`` are reserved: an object that defines
+    either raises :class:`~dmock.ConfigurationError` at construction.
+
+    Args:
+        obj: Live object instance to wrap (not a class). Positional-only.
+
+    Raises:
+        ConfigurationError: If `obj` is a class/type, or defines a reserved DSL
+            name (``observe`` or ``verify``).
+
+    Examples:
+        >>> from dmock import AnythingOfType, DeclarativeSpy
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str:
+        ...         return key.upper()
+        >>> spy = DeclarativeSpy(Service())
+        >>> spy.observe("fetch", "a").returns("A").once()
+        Observation(fetch('a'))
+        >>> spy.fetch("a")
+        'A'
+        >>> spy.observe(Service.fetch, AnythingOfType(str)).returns("B").once()
+        Observation(fetch(AnythingOfType(str, exact=False)))
+        >>> spy.fetch("b")
+        'B'
+        >>> spy.verify()
+        >>> spy
+        DeclarativeSpy(obj=<...Service object...>)
+    """
+
     @overload
     def __new__(cls, obj: type[T], /) -> Never: ...
     @overload
@@ -193,6 +232,39 @@ class DeclarativeSpy(Generic[T], _Base):
         *args: object,
         **kwargs: object,
     ) -> Any:
+        """Register an observation for callable attribute `name` on the wrapped object.
+
+        `name` is a method name or an unbound method/callable taken from the
+        wrapped object's class. Absence of `*args` and `**kwargs` means a call
+        with no arguments, not a wildcard. Use matchers such as
+        :data:`~dmock.Anything` or :data:`~dmock.ANY_ARGS` to accept varying
+        values.
+
+        Args:
+            name: Callable attribute on the wrapped object. Positional-only.
+            *args: Expected positional arguments, possibly matchers.
+            **kwargs: Expected keyword arguments, possibly matchers.
+
+        Returns:
+            An :class:`~dmock.Observation` for chaining outcome checks and
+            quantifiers.
+
+        Raises:
+            AttributeError: If `name` is not on the wrapped object.
+            ConfigurationError: If `name` is not callable or cannot be
+                resolved.
+
+        Examples:
+            >>> from dmock import DeclarativeSpy
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A")
+            Observation(fetch('a'))
+            >>> spy.fetch("a")
+            'A'
+        """
         resolved = self.__spec_attribute_name(name)
         attr = getattr(self.__obj, resolved)  # spec validation
         # TODO: add something similar to dmock
@@ -211,6 +283,29 @@ class DeclarativeSpy(Generic[T], _Base):
         return exp
 
     def verify(self) -> None:
+        """Verify that every registered observation meets its quantifier.
+
+        Raises:
+            UnsatisfiedObservationError: One or more observations are unmet.
+                The message lists each as ``expected <constraint>, got <n>``
+                and includes the call history when any calls were dispatched.
+
+        Examples:
+            >>> from dmock import DeclarativeSpy, UnsatisfiedObservationError
+            >>> class Service:
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").once()
+            Observation(fetch('a'))
+            >>> try:
+            ...     spy.verify()
+            ... except UnsatisfiedObservationError as exc:
+            ...     "expected exactly 1 call(s), got 0" in str(exc)
+            True
+            >>> spy.fetch("a")
+            'A'
+        """
         unsatisfied = [e for e in self.__observations if not e.is_satisfied()]
         if not unsatisfied:
             return
@@ -376,4 +471,30 @@ def dspy(spec: type[T], /) -> Never: ...
 @overload
 def dspy(spec: T, /) -> DeclarativeSpy[T]: ...
 def dspy(spec: T, /) -> DeclarativeSpy[T]:
+    """Create a :class:`DeclarativeSpy` wrapping `spec`.
+
+    Convenience factory equivalent to ``DeclarativeSpy(spec)``.
+
+    Args:
+        spec: Live object instance to spy on (not a class). Positional-only.
+
+    Returns:
+        A new :class:`DeclarativeSpy` wrapping `spec`.
+
+    Raises:
+        ConfigurationError: If `spec` is a class/type or defines a reserved
+            DSL name.
+
+    Examples:
+        >>> from dmock import dspy
+        >>> class Service:
+        ...     def fetch(self, key: str) -> str:
+        ...         return key.upper()
+        >>> spy = dspy(Service())
+        >>> spy.observe("fetch", "a").returns("A").once()
+        Observation(fetch('a'))
+        >>> spy.fetch("a")
+        'A'
+        >>> spy.verify()
+    """
     return DeclarativeSpy(spec)

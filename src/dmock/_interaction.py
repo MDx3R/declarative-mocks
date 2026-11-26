@@ -56,6 +56,13 @@ class Expectation(ABC, Generic[T, P, R]):
         'first'
         >>> mock.fetch("a")
         'second'
+        >>> mock.expect("fetch", "b").returns("ok", repeat=2)
+        Expectation(fetch('b'))
+        >>> mock.fetch("b")
+        'ok'
+        >>> mock.fetch("b")
+        'ok'
+        >>> mock.verify()
     """
 
     # -- Fluent outcome builders --
@@ -152,7 +159,40 @@ class Expectation(ABC, Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Any: ...
+    ) -> Any:
+        """Register a follow-up expectation ordered after this one.
+
+        Delegates to the parent :class:`~dmock.DeclarativeMock` and
+        automatically chains :meth:`not_before` on `self`, so the new
+        expectation cannot match until this one is satisfied.
+
+        Args:
+            name: Spec attribute to intercept. Positional-only.
+            *args: Expected positional arguments, possibly matchers.
+            **kwargs: Expected keyword arguments, possibly matchers.
+
+        Returns:
+            A new :class:`Expectation` ordered after `self`.
+
+        Examples:
+            >>> from dmock import DeclarativeMock
+            >>> class Service:
+            ...     def start(self) -> None: ...
+            ...     def fetch(self, key: str) -> str: ...
+            >>> mock = DeclarativeMock(Service)
+            >>> _ = (
+            ...     mock.expect("start")
+            ...     .returns(None)
+            ...     .once()
+            ...     .expect("fetch", "a")
+            ...     .returns("A")
+            ... )
+            >>> mock.start()
+            >>> mock.fetch("a")
+            'A'
+            >>> mock.verify()
+        """
+        ...
 
     @abstractmethod
     def returns(self, value: R, *, repeat: int = 1) -> Self:
@@ -174,8 +214,10 @@ class Expectation(ABC, Generic[T, P, R]):
             >>> class Service:
             ...     def fetch(self, key: str) -> str: ...
             >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A")
+            >>> mock.expect("fetch", "a").returns("A", repeat=2)
             Expectation(fetch('a'))
+            >>> mock.fetch("a")
+            'A'
             >>> mock.fetch("a")
             'A'
         """
@@ -537,23 +579,35 @@ class Expectation(ABC, Generic[T, P, R]):
 
 
 class Observation(ABC, Generic[T, P, R]):
-    """A single expected call: fluent builder for outcomes and quantifiers.
+    """A single observed call: fluent builder for result checks and quantifiers.
 
-    Constructed by :meth:`~dmock.DeclarativeMock.expect`. Chained ``returns`` /
-    ``raises`` / ``runs`` are a sequence of outcomes for successive matching
-    calls.
+    Constructed by :meth:`~dmock.DeclarativeSpy.observe`. Chained
+    ``returns`` / ``raises`` / ``condition`` are a sequence of checks for
+    successive matching calls.
 
     Examples:
-        >>> from dmock import DeclarativeMock
+        >>> from dmock import Check, DeclarativeSpy
         >>> class Service:
-        ...     def fetch(self, key: str) -> str: ...
-        >>> mock = DeclarativeMock(Service)
-        >>> mock.expect("fetch", "a").returns("first").returns("second")
+        ...     def __init__(self) -> None:
+        ...         self._values = iter(["first", "second", "ok", "ok"])
+        ...
+        ...     def fetch(self, key: str) -> str:
+        ...         return next(self._values)
+        >>> spy = DeclarativeSpy(Service())
+        >>> spy.observe("fetch", "a").returns("first").returns("second")
         Observation(fetch('a'))
-        >>> mock.fetch("a")
+        >>> spy.fetch("a")
         'first'
-        >>> mock.fetch("a")
+        >>> spy.fetch("a")
         'second'
+        >>> is_short = Check[str](str.islower) & (lambda v: len(v) == 2)
+        >>> spy.observe("fetch", "b").returns("ok", condition=is_short, repeat=2)
+        Observation(fetch('b'))
+        >>> spy.fetch("b")
+        'ok'
+        >>> spy.fetch("b")
+        'ok'
+        >>> spy.verify()
     """
 
     # -- Fluent outcome builders --
@@ -565,7 +619,7 @@ class Observation(ABC, Generic[T, P, R]):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -575,7 +629,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -585,7 +639,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -594,7 +648,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -603,7 +657,7 @@ class Observation(ABC, Generic[T, P, R]):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -613,7 +667,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -623,7 +677,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -632,7 +686,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -641,7 +695,7 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., Any]: ...
+    ) -> Observation[T, ..., Any]: ...
 
     @abstractmethod
     def observe(
@@ -650,7 +704,43 @@ class Observation(ABC, Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Any: ...
+    ) -> Any:
+        """Register a follow-up observation ordered after this one.
+
+        Delegates to the parent :class:`~dmock.DeclarativeSpy` and
+        automatically chains :meth:`not_before` on `self`, so the new
+        observation cannot match until this one is satisfied.
+
+        Args:
+            name: Callable attribute on the wrapped object. Positional-only.
+            *args: Expected positional arguments, possibly matchers.
+            **kwargs: Expected keyword arguments, possibly matchers.
+
+        Returns:
+            A new :class:`Observation` ordered after `self`.
+
+        Examples:
+            >>> from dmock import DeclarativeSpy
+            >>> class Service:
+            ...     def start(self) -> None:
+            ...         pass
+            ...
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> _ = (
+            ...     spy.observe("start")
+            ...     .returns(None)
+            ...     .once()
+            ...     .observe("fetch", "a")
+            ...     .returns("A")
+            ... )
+            >>> spy.start()
+            >>> spy.fetch("a")
+            'A'
+            >>> spy.verify()
+        """
+        ...
 
     @abstractmethod
     def returns(
@@ -660,12 +750,13 @@ class Observation(ABC, Generic[T, P, R]):
         condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
-        """Declare the return value for the next matching call.
+        """Assert the return value for the next matching call.
 
         Args:
-            value: Object returned as-is (tuples are not unpacked).
-            condition: ...
-            repeat: How many successive calls receive this outcome. Must be
+            value: Expected return value (compared with ``==``).
+            condition: Optional predicate called with the actual return value
+                after `value` matches.
+            repeat: How many successive calls expect this result. Must be
                 at least 1.
 
         Returns:
@@ -675,14 +766,22 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If `repeat` is less than 1.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import Check, DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A")
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A")
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
+            >>> is_upper = Check[str](str.isupper) & (lambda v: len(v) == 1)
+            >>> spy.observe("fetch", "b").returns("B", condition=is_upper, repeat=2)
+            Observation(fetch('b'))
+            >>> spy.fetch("b")
+            'B'
+            >>> spy.fetch("b")
+            'B'
         """
         ...
 
@@ -710,12 +809,14 @@ class Observation(ABC, Generic[T, P, R]):
         condition: Callable[[E], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
-        """Declare that the next matching call raises `exc`.
+        """Assert that the next matching call raises `exc`.
 
         Args:
-            exc: Exception instance, or a type instantiated with no arguments.
-            condition: ...
-            repeat: How many successive calls raise `exc`. Must be at least 1.
+            exc: Expected exception type (checked with ``isinstance``) or
+                exception instance (also checks ``str(actual) == str(exc)``).
+            condition: Optional predicate called with the raised exception
+                after `exc` matches.
+            repeat: How many successive calls expect `exc`. Must be at least 1.
 
         Returns:
             This observation, for chaining.
@@ -724,30 +825,37 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If `repeat` is less than 1.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").raises(KeyError)
+            ...     def fetch(self, key: str) -> str:
+            ...         raise KeyError(key)
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").raises(
+            ...     KeyError, condition=lambda exc: exc.args == ("a",), repeat=2
+            ... )
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             Traceback (most recent call last):
                 ...
-            KeyError
+            KeyError: 'a'
+            >>> spy.fetch("a")
+            Traceback (most recent call last):
+                ...
+            KeyError: 'a'
         """
         ...
 
     @abstractmethod
     def condition(self, func: Callable[[Any], bool], *, repeat: int = 1) -> Self:
-        """Call `func` with the actual arguments for the next matching call.
+        """Assert that `func` returns ``True`` for the next matching call's outcome.
 
-        The return value of `func` becomes the result of that call. Chaining
-        ``runs`` then ``returns`` schedules two outcomes for two successive
-        calls, not a side effect plus a return on the same call.
+        `func` receives either the return value or the raised exception from
+        the wrapped object.
 
         Args:
-            func: Called as ``func(*args, **kwargs)`` of the matching invocation.
-            repeat: How many successive calls invoke `func`. Must be at least 1.
+            func: Predicate called with the call's return value or raised
+                exception.
+            repeat: How many successive calls check `func`. Must be at least 1.
 
         Returns:
             This observation, for chaining.
@@ -756,22 +864,30 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If `repeat` is less than 1.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import Check, DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
             >>> seen: list[str] = []
-            >>> def capture(key: str) -> str:
-            ...     seen.append(key)
-            ...     return "from-runs"
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").runs(capture).returns("from-returns")
+            >>> def check_upper(value: str) -> bool:
+            ...     seen.append(value)
+            ...     return value.isupper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").condition(check_upper).returns("A")
             Observation(fetch('a'))
-            >>> mock.fetch("a")
-            'from-runs'
+            >>> spy.fetch("a")
+            'A'
             >>> seen
-            ['a']
-            >>> mock.fetch("a")
-            'from-returns'
+            ['A']
+            >>> spy.fetch("a")
+            'A'
+            >>> is_single_upper = Check[str](str.isupper) & (lambda v: len(v) == 1)
+            >>> spy.observe("fetch", "b").condition(is_single_upper, repeat=2)
+            Observation(fetch('b'))
+            >>> spy.fetch("b")
+            'B'
+            >>> spy.fetch("b")
+            'B'
         """
         ...
 
@@ -785,15 +901,16 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").once()
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").once()
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -805,17 +922,18 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").twice()
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").twice()
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -830,17 +948,18 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").times(2)
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").times(2)
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -855,17 +974,18 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").at_least(2)
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").at_least(2)
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -880,15 +1000,16 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").at_most(2)
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").at_most(2)
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -904,33 +1025,35 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").between(1, 2)
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").between(1, 2)
             Observation(fetch('a'))
-            >>> mock.fetch("a")
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
     @abstractmethod
     def maybe(self) -> Self:
-        """Make this observation optional: zero calls still pass :meth:`~dmock.DeclarativeMock.verify`.
+        """Make this observation optional: zero calls still pass :meth:`~dmock.DeclarativeSpy.verify`.
 
         Returns:
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").maybe()
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").returns("A").maybe()
             Observation(fetch('a'))
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -944,13 +1067,14 @@ class Observation(ABC, Generic[T, P, R]):
             This observation, for chaining.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").never()
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> spy.observe("fetch", "a").never()
             Observation(fetch('a'))
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -970,18 +1094,21 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If adding a requirement would create a cycle.
 
         Examples:
-            >>> from dmock import DeclarativeMock
+            >>> from dmock import DeclarativeSpy
             >>> class Service:
-            ...     def start(self) -> None: ...
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> init = mock.expect("start").returns(None).once()
-            >>> mock.expect("fetch", "a").returns("A").not_before(init)
+            ...     def start(self) -> None:
+            ...         pass
+            ...
+            ...     def fetch(self, key: str) -> str:
+            ...         return key.upper()
+            >>> spy = DeclarativeSpy(Service())
+            >>> init = spy.observe("start").returns(None).once()
+            >>> spy.observe("fetch", "a").returns("A").not_before(init)
             Observation(fetch('a'))
-            >>> mock.start()
-            >>> mock.fetch("a")
+            >>> spy.start()
+            >>> spy.fetch("a")
             'A'
-            >>> mock.verify()
+            >>> spy.verify()
         """
         ...
 
@@ -1054,6 +1181,8 @@ class Observation(ABC, Generic[T, P, R]):
 
 
 class Mediator(Generic[T], ABC):
+    """Internal bridge used by :class:`Interaction` to register chained interactions."""
+
     @abstractmethod
     def mediate(
         self,
@@ -1061,28 +1190,17 @@ class Mediator(Generic[T], ABC):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, Any, Any] | Observation[T, Any, Any]: ...
+    ) -> Expectation[T, Any, Any] | Observation[T, Any, Any]:
+        """Register a new interaction on the parent mock or spy."""
+        ...
 
 
 @final
 class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
-    """A single expected call: fluent builder for outcomes and quantifiers.
+    """Concrete fluent builder implementing both :class:`Expectation` and :class:`Observation`.
 
-    Constructed by :meth:`~dmock.DeclarativeMock.expect`. Chained ``returns`` /
-    ``raises`` / ``runs`` are a sequence of outcomes for successive matching
-    calls.
-
-    Examples:
-        >>> from dmock import DeclarativeMock
-        >>> class Service:
-        ...     def fetch(self, key: str) -> str: ...
-        >>> mock = DeclarativeMock(Service)
-        >>> mock.expect("fetch", "a").returns("first").returns("second")
-        Expectation(fetch('a'))
-        >>> mock.fetch("a")
-        'first'
-        >>> mock.fetch("a")
-        'second'
+    Constructed via :meth:`expectation` or :meth:`observation` by
+    :class:`~dmock.DeclarativeMock` and :class:`~dmock.DeclarativeSpy`.
     """
 
     def __init__(
@@ -1117,6 +1235,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         args: tuple[object, ...],
         kwargs: dict[str, object],
     ) -> Expectation[T, P, R]:
+        """Construct an :class:`Interaction` representing an :class:`Expectation`."""
         return cls(
             mediator=mediator,
             interaction_name="Expectation",
@@ -1133,6 +1252,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         args: tuple[object, ...],
         kwargs: dict[str, object],
     ) -> Observation[T, P, R]:
+        """Construct an :class:`Interaction` representing an :class:`Observation`."""
         return cls(
             mediator=mediator,
             interaction_name="Observation",
@@ -1235,7 +1355,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         *args: object,
         **kwargs: object,
     ) -> Any:
-        return self._mediator.mediate(name, args, kwargs).not_before(self)
+        return self._mediator.mediate(name, *args, **kwargs).not_before(self)
 
     @overload
     def observe(
@@ -1244,7 +1364,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1254,7 +1374,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1264,7 +1384,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1273,7 +1393,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1282,7 +1402,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         any_args: _AnyArgsSentinel,
         any_kwargs: _AnyKwargsSentinel,
         /,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1292,7 +1412,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1302,7 +1422,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1311,7 +1431,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: P2.args,
         **kwargs: P2.kwargs,
-    ) -> Expectation[T, P2, R2]: ...
+    ) -> Observation[T, P2, R2]: ...
 
     @overload
     def observe(
@@ -1320,7 +1440,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         /,
         *args: object,
         **kwargs: object,
-    ) -> Expectation[T, ..., Any]: ...
+    ) -> Observation[T, ..., Any]: ...
 
     def observe(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
@@ -1329,7 +1449,7 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         *args: object,
         **kwargs: object,
     ) -> Any:
-        return self._mediator.mediate(name, args, kwargs).not_before(self)
+        return self._mediator.mediate(name, *args, **kwargs).not_before(self)
 
     def returns(
         self,
@@ -1338,30 +1458,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         condition: Callable[[R], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
-        """Declare the return value for the next matching call.
-
-        Args:
-            value: Object returned as-is (tuples are not unpacked).
-            condition: ...
-            repeat: How many successive calls receive this outcome. Must be
-                at least 1.
-
-        Returns:
-            This expectation, for chaining.
-
-        Raises:
-            ConfigurationError: If `repeat` is less than 1.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A")
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-        """
         if condition is not None:
             self._append_outcome(ReturnCheck(value, condition), repeat)
             return self
@@ -1399,31 +1495,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         condition: Callable[[Any], bool] | None = None,
         repeat: int = 1,
     ) -> Self:
-        """Declare that the next matching call raises `exc`.
-
-        Args:
-            exc: Exception instance, or a type instantiated with no arguments.
-            condition: ...
-            repeat: How many successive calls raise `exc`. Must be at least 1.
-
-        Returns:
-            This expectation, for chaining.
-
-        Raises:
-            ConfigurationError: If `repeat` is less than 1.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").raises(KeyError)
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            Traceback (most recent call last):
-                ...
-            KeyError
-        """
         if condition is not None:
             self._append_outcome(RaiseCheck(exc, condition), repeat)
             return self
@@ -1438,40 +1509,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     def runs(self, func: Callable[P, Awaitable[R]], *, repeat: int = 1) -> Self: ...
 
     def runs(self, func: Callable[P, R | Awaitable[R]], *, repeat: int = 1) -> Self:
-        """Call `func` with the actual arguments for the next matching call.
-
-        The return value of `func` becomes the result of that call. Chaining
-        ``runs`` then ``returns`` schedules two outcomes for two successive
-        calls, not a side effect plus a return on the same call.
-
-        Args:
-            func: Called as ``func(*args, **kwargs)`` of the matching invocation.
-            repeat: How many successive calls invoke `func`. Must be at least 1.
-
-        Returns:
-            This expectation, for chaining.
-
-        Raises:
-            ConfigurationError: If `repeat` is less than 1.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> seen: list[str] = []
-            >>> def capture(key: str) -> str:
-            ...     seen.append(key)
-            ...     return "from-runs"
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").runs(capture).returns("from-returns")
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'from-runs'
-            >>> seen
-            ['a']
-            >>> mock.fetch("a")
-            'from-returns'
-        """
         self._append_outcome(RunOutcome(func), repeat)
         return self
 
@@ -1494,203 +1531,33 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
     # -- Fluent quantifiers --
 
     def once(self) -> Self:
-        """Require exactly one matching call.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").once()
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(ExactlyN(1))
 
     def twice(self) -> Self:
-        """Require exactly two matching calls.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").twice()
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(ExactlyN(2))
 
     def times(self, n: int) -> Self:
-        """Require exactly `n` matching calls.
-
-        Args:
-            n: Exact call count. Must be at least 1.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").times(2)
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(ExactlyN(n))
 
     def at_least(self, n: int) -> Self:
-        """Require at least `n` matching calls, with no upper bound.
-
-        Args:
-            n: Minimum call count. Must be at least 1.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").at_least(2)
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(AtLeast(n))
 
     def at_most(self, n: int) -> Self:
-        """Allow between 0 and `n` matching calls, inclusive.
-
-        Args:
-            n: Maximum call count.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").at_most(2)
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(Between(0, n))
 
     def between(self, lo: int, hi: int) -> Self:
-        """Require between `lo` and `hi` matching calls, inclusive.
-
-        Args:
-            lo: Minimum call count.
-            hi: Maximum call count.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").between(1, 2)
-            Expectation(fetch('a'))
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         return self._set_quantifier(Between(lo, hi))
 
     def maybe(self) -> Self:
-        """Make this expectation optional: zero calls still pass :meth:`~dmock.DeclarativeMock.verify`.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").returns("A").maybe()
-            Expectation(fetch('a'))
-            >>> mock.verify()
-        """
         self._optional = True
         return self
 
     def never(self) -> Self:
-        """Forbid any matching call.
-
-        A match raises :class:`~dmock.UnexpectedCallError` immediately.
-
-        Returns:
-            This expectation, for chaining.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> mock.expect("fetch", "a").never()
-            Expectation(fetch('a'))
-            >>> mock.verify()
-        """
         return self._set_quantifier(Never())
 
     def not_before(
         self, *interactions: Expectation[T, P, R] | Observation[T, P, R]
     ) -> Self:
-        """Require that every `interactions` item is satisfied before this one.
-
-        Args:
-            *interactions: Prerequisites that must meet their own quantifiers.
-
-        Returns:
-            This expectation, for chaining.
-
-        Raises:
-            ConfigurationError: If adding a requirement would create a cycle.
-
-        Examples:
-            >>> from dmock import DeclarativeMock
-            >>> class Service:
-            ...     def start(self) -> None: ...
-            ...     def fetch(self, key: str) -> str: ...
-            >>> mock = DeclarativeMock(Service)
-            >>> init = mock.expect("start").returns(None).once()
-            >>> mock.expect("fetch", "a").returns("A").not_before(init)
-            Expectation(fetch('a'))
-            >>> mock.start()
-            >>> mock.fetch("a")
-            'A'
-            >>> mock.verify()
-        """
         for req in interactions:
             if self._is_reachable_from(req):
                 raise ConfigurationError(
@@ -1726,7 +1593,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
 
     @property
     def requires(self) -> Sequence[Expectation[T, Any, Any] | Observation[T, Any, Any]]:
-        """Prerequisites that must be satisfied before this expectation can match."""
         return self._requires
 
     def _set_quantifier(self, q: Quantifier) -> Self:
@@ -1742,7 +1608,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
 
     @property
     def quantifier(self) -> Quantifier:
-        """Effective call-count constraint, defaulting to the outcome count."""
         if self._quantifier is not None:
             return self._quantifier
 
@@ -1750,12 +1615,10 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
 
     @property
     def is_quantifier_locked(self) -> bool:
-        """Return whether an explicit quantifier has been set."""
         return self._quantifier is not None
 
     @property
     def method_name(self) -> str:
-        """Spec attribute this expectation intercepts."""
         return self._method_name
 
     # -- Internal (called by DeclarativeMock) --
@@ -1765,7 +1628,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         args: tuple[object, ...],
         kwargs: dict[str, object],
     ) -> bool:
-        """Return whether `args` and `kwargs` match this expectation."""
         if not self._has_any_args:
             if len(args) != len(self._expected_args):
                 return False
@@ -1785,11 +1647,6 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         return True
 
     def consume(self) -> Outcome:
-        """Record a match and return the next outcome.
-
-        Raises:
-            ExceededCallError: If this call exceeds the quantifier upper bound.
-        """
         q = self.quantifier
         self._calls += 1
         if q.is_exceeded(self._calls):
@@ -1802,23 +1659,19 @@ class Interaction(Expectation[T, P, R], Observation[T, P, R], Generic[T, P, R]):
         return self._outcomes[index]
 
     def is_optional(self) -> bool:
-        """Return whether :meth:`maybe` was applied."""
         return self._optional
 
     def is_satisfied(self) -> bool:
-        """Return whether the quantifier constraint is already met."""
         if self._calls == 0 and self.is_optional():
             return True
 
         return self.quantifier.is_satisfied(self._calls)
 
     def is_exhausted(self) -> bool:
-        """Return whether no further matching calls are allowed."""
         return self.quantifier.is_exhausted(self._calls)
 
     @property
     def call_count(self) -> int:
-        """Number of times this expectation has been consumed."""
         return self._calls
 
     def __repr__(self) -> str:

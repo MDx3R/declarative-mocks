@@ -68,6 +68,20 @@ class MockRegistry:
 
 
 class SpyRegistry:
+    """Live spies to verify when a test finishes.
+
+    :class:`~dmock.DeclarativeSpy` registers itself on construction.
+    :meth:`teardown` copies that list, replaces it with an empty one, then
+    calls :meth:`~dmock.DeclarativeSpy.verify` on the copy. Clearing first
+    means a failed verify cannot leak spies into the next test. A later
+    :meth:`teardown` with nothing registered does nothing.
+
+    :meth:`clear` drops registered spies without verifying them.
+
+    Verification is fail-fast. If ``verify`` raises, spies later in the copy
+    are not checked. They have already been dropped from the registry.
+    """
+
     _spies: ClassVar[list[DeclarativeSpy[Any]]] = []
 
     @property
@@ -95,7 +109,7 @@ class SpyRegistry:
         """Verify every registered spy and forget them.
 
         Raises:
-            UnsatisfiedExpectationError: A registered spy is unmet.
+            UnsatisfiedObservationError: A registered spy is unmet.
                 Remaining spies in this batch are not verified.
         """
         spies = list(cls._spies)
