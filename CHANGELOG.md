@@ -9,10 +9,10 @@ All notable changes to this project are documented in this file.
 - Add `Observation` outcome checks: `.returns(value, *, condition=None, repeat=1)`, `.raises(exc, *, condition=None, repeat=1)`, and `.condition(func, *, repeat=1)`, plus quantifiers, `.maybe()`, `.not_before()`, `in_order()`, and `UnsatisfiedObservationError`.
 - Add `dmock.checks` (`Check`, `CheckNot`, `CheckAnd`, `CheckOr`) with `~`, `&`, and `|` operators for composing predicate checks.
 - Add chained interactions: `Expectation.expect(...)` and `Observation.observe(...)` register a follow-up interaction ordered with `.not_before(self)`.
-- Add Python 3.15 support.
 - `Attr` accepts several attribute names and matches only when the object has every one.
 - `Namespace` matches an object whose slots and instance attributes are exactly the given attributes. Class attributes and properties do not count.
 - `PartialNamespace` matches an object that has the given slots and instance attributes. Class attributes and properties do not count. Extra attributes are ignored.
+- Add Python 3.15 support.
 
 ## [0.4.2] - 2026-10-31
 

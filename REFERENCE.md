@@ -117,12 +117,12 @@ Registers a follow-up observation on the parent `DeclarativeSpy` and automatical
 
 Composable predicate wrappers for `Observation` `condition` checks:
 
-| Type / Operator                       | Role                                                     |
-| ------------------------------------- | -------------------------------------------------------- |
-| `Check(*predicates)`                  | True when every predicate returns truthy (AND semantics) |
-| `CheckNot(*predicates)` / `~check`    | True when no predicate matches                           |
-| `CheckAnd(*predicates)` / `a & b`     | True when all predicates match (supports plain callables)|
-| `CheckOr(*predicates)` / `a \| b`     | True when any predicate matches (supports plain callables)|
+| Type / Operator                    | Role                                                       |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `Check(*predicates)`               | True when every predicate returns truthy (AND semantics)   |
+| `CheckNot(*predicates)` / `~check` | True when no predicate matches                             |
+| `CheckAnd(*predicates)` / `a & b`  | True when all predicates match (supports plain callables)  |
+| `CheckOr(*predicates)` / `a \| b`  | True when any predicate matches (supports plain callables) |
 
 ## Chaining multiple outcomes
 
@@ -296,8 +296,8 @@ Under pytest this check runs when the test finishes for both mocks and spies. An
 
 | Exception                     | When raised                                                                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DeclarativeMockError`        | Base type for the public errors below; also raised by `DeclarativeSpy` when a `.returns()`, `.raises()`, or `.condition()` check fails                       |
-| `UnexpectedCallError`         | A method is called without a matching registered interaction, or a `never()` interaction matches, or all matching interactions are exhausted                   |
+| `DeclarativeMockError`        | Base type for the public errors below; also raised by `DeclarativeSpy` when a `.returns()`, `.raises()`, or `.condition()` check fails                        |
+| `UnexpectedCallError`         | A method is called without a matching registered interaction, or a `never()` interaction matches, or all matching interactions are exhausted                  |
 | `UnsatisfiedExpectationError` | `DeclarativeMock.verify()` finds one or more expectations not satisfied                                                                                       |
 | `UnsatisfiedObservationError` | `DeclarativeSpy.verify()` finds one or more observations not satisfied                                                                                        |
 | `ConfigurationError`          | Invalid setup: conflicting quantifiers, reserved DSL names, `expect`/`property` clash, cycles in `not_before`, `repeat < 1`, non-instance/non-callable on spy |
