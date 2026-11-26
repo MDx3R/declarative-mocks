@@ -7,13 +7,13 @@ from unittest.mock import patch
 
 import pytest
 
-from dmock._exceptions import (
-    UnsatisfiedExpectationError,
-    UnsatisfiedObservationError,
-)
 from dmock._mock import DeclarativeMock
 from dmock._registry import MockRegistry, SpyRegistry
 from dmock._spy import DeclarativeSpy
+from dmock.exceptions import (
+    UnsatisfiedExpectationError,
+    UnsatisfiedObservationError,
+)
 
 
 class _Service(ABC):

@@ -7,8 +7,11 @@ from typing import Any
 
 import pytest
 
-from dmock._check import Check
-from dmock._exceptions import (
+from dmock._interaction import in_order
+from dmock._mock import DeclarativeMock
+from dmock._spy import DeclarativeSpy, dspy
+from dmock.checks import Check
+from dmock.exceptions._exceptions import (
     BlockedCallError,
     ConfigurationError,
     DeclarativeMockError,
@@ -16,8 +19,7 @@ from dmock._exceptions import (
     UnexpectedCallError,
     UnsatisfiedObservationError,
 )
-from dmock._interaction import in_order
-from dmock._matchers import (
+from dmock.matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
@@ -25,8 +27,6 @@ from dmock._matchers import (
     LessThan,
     MatchedBy,
 )
-from dmock._mock import DeclarativeMock
-from dmock._spy import DeclarativeSpy, dspy
 
 
 # ---------------------------------------------------------------------------

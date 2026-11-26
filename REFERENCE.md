@@ -152,7 +152,7 @@ mock.expect("process_order", Anything()).returns("processed").at_least(1)
 Variadic calls (any `*args` / `**kwargs` shape):
 
 ```python
-from dmock import ANY_ARGS, ANY_KWARGS
+from dmock.matchers import ANY_ARGS, ANY_KWARGS
 
 mock.expect("process_order", ANY_ARGS, ANY_KWARGS).returns("processed").at_least(1)
 ```

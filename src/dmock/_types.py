@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from dmock._exceptions import ConfigurationError
+from dmock.exceptions._exceptions import ConfigurationError
 
 
 if TYPE_CHECKING:

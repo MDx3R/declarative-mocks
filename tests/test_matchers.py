@@ -1,4 +1,4 @@
-"""Tests for dmock._matchers."""
+"""Tests for dmock.matchers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from uuid import UUID
 
 import pytest
 
-from dmock._matchers import (
+from dmock.matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     AWARE_DATETIME,
@@ -65,6 +65,8 @@ from dmock._matchers import (
     SequenceOf,
     SetOf,
     StartsWith,
+)
+from dmock.matchers._matchers import (
     _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
     _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )

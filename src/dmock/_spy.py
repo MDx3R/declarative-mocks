@@ -5,13 +5,6 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import TYPE_CHECKING, Generic, final, overload
 
-from dmock._exceptions import (
-    BlockedCallError,
-    ConfigurationError,
-    DeclarativeMockError,
-    NoMatchingCallError,
-    UnsatisfiedObservationError,
-)
 from dmock._interaction import Interaction, Mediator
 from dmock._protocols import T
 from dmock._registry import SpyRegistry
@@ -24,6 +17,13 @@ from dmock._types import (
     ReturnCheck,
     ReturnOutcome,
 )
+from dmock.exceptions._exceptions import (
+    BlockedCallError,
+    ConfigurationError,
+    DeclarativeMockError,
+    NoMatchingCallError,
+    UnsatisfiedObservationError,
+)
 
 
 if TYPE_CHECKING:
@@ -31,13 +31,13 @@ if TYPE_CHECKING:
     from typing import Any, Concatenate, Never, Self
 
     from dmock._interaction import Expectation, Observation
-    from dmock._matchers import (
-        _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
-        _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
-    )
     from dmock._protocols import P, R
     from dmock._types import (
         Outcome,
+    )
+    from dmock.matchers._matchers import (
+        _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
+        _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
     )
 
     class _Base(Any):  # type: ignore[misc]
@@ -95,7 +95,8 @@ class DeclarativeSpy(Generic[T], _Base):
             name (``observe`` or ``verify``).
 
     Examples:
-        >>> from dmock import AnythingOfType, DeclarativeSpy
+        >>> from dmock import DeclarativeSpy
+        >>> from dmock.matchers import AnythingOfType
         >>> class Service:
         ...     def fetch(self, key: str) -> str:
         ...         return key.upper()
@@ -291,7 +292,8 @@ class DeclarativeSpy(Generic[T], _Base):
                 and includes the call history when any calls were dispatched.
 
         Examples:
-            >>> from dmock import DeclarativeSpy, UnsatisfiedObservationError
+            >>> from dmock import DeclarativeSpy
+            >>> from dmock.exceptions import UnsatisfiedObservationError
             >>> class Service:
             ...     def fetch(self, key: str) -> str:
             ...         return key.upper()

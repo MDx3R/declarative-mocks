@@ -24,7 +24,7 @@ class Check(Generic[T]):
             a boolean.
 
     Examples:
-        >>> from dmock import Check
+        >>> from dmock.checks import Check
         >>> is_positive = Check(lambda x: x > 0)
         >>> is_even = Check(lambda x: x % 2 == 0)
         >>> (is_positive & is_even)(4)
@@ -46,7 +46,7 @@ class Check(Generic[T]):
         """Return a :class:`CheckNot` negating this check.
 
         Examples:
-            >>> from dmock import Check
+            >>> from dmock.checks import Check
             >>> non_empty = ~Check(lambda s: s == "")
             >>> non_empty("hi")
             True
@@ -59,7 +59,7 @@ class Check(Generic[T]):
         """Return a :class:`CheckAnd` requiring both `self` and `other`.
 
         Examples:
-            >>> from dmock import Check
+            >>> from dmock.checks import Check
             >>> c = Check(lambda x: x > 0) & (lambda x: x < 10)
             >>> c(5)
             True
@@ -82,7 +82,7 @@ class Check(Generic[T]):
         """Return a :class:`CheckOr` requiring either `self` or `other`.
 
         Examples:
-            >>> from dmock import Check
+            >>> from dmock.checks import Check
             >>> c = Check(lambda x: x < 0) | (lambda x: x > 10)
             >>> c(-1)
             True
@@ -117,7 +117,7 @@ class CheckNot(Check[T]):
         *predicates: Predicates to negate.
 
     Examples:
-        >>> from dmock import CheckNot
+        >>> from dmock.checks import CheckNot
         >>> not_zero = CheckNot(lambda x: x == 0)
         >>> not_zero(1)
         True
@@ -142,7 +142,7 @@ class CheckAnd(Check[T]):
         *predicates: Predicates that must all hold.
 
     Examples:
-        >>> from dmock import CheckAnd
+        >>> from dmock.checks import CheckAnd
         >>> in_range = CheckAnd(lambda x: x >= 1, lambda x: x <= 5)
         >>> in_range(3)
         True
@@ -167,7 +167,7 @@ class CheckOr(Check[T]):
         *predicates: Predicates of which at least one must hold.
 
     Examples:
-        >>> from dmock import CheckOr
+        >>> from dmock.checks import CheckOr
         >>> extreme = CheckOr(lambda x: x < 0, lambda x: x > 100)
         >>> extreme(150)
         True

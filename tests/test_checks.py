@@ -1,8 +1,8 @@
-"""Tests for dmock._check."""
+"""Tests for dmock.checks."""
 
 from __future__ import annotations
 
-from dmock._check import Check, CheckAnd, CheckNot, CheckOr
+from dmock.checks import Check, CheckAnd, CheckNot, CheckOr
 
 
 class TestCheck:

@@ -8,7 +8,9 @@ from unittest.mock import MagicMock, Mock, NonCallableMagicMock
 
 import pytest
 
-from dmock._exceptions import (
+from dmock._interaction import in_order
+from dmock._mock import DeclarativeMock, dmock
+from dmock.exceptions._exceptions import (
     BlockedCallError,
     ConfigurationError,
     NoMatchingCallError,
@@ -16,8 +18,7 @@ from dmock._exceptions import (
     UnregisteredCallError,
     UnsatisfiedExpectationError,
 )
-from dmock._interaction import in_order
-from dmock._matchers import (
+from dmock.matchers import (
     ANY_ARGS,
     ANY_KWARGS,
     Anything,
@@ -25,7 +26,6 @@ from dmock._matchers import (
     LessThan,
     MatchedBy,
 )
-from dmock._mock import DeclarativeMock, dmock
 
 
 # ---------------------------------------------------------------------------

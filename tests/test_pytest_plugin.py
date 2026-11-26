@@ -7,13 +7,13 @@ from abc import ABC, abstractmethod
 import pytest
 
 from dmock._interaction import in_order
-from dmock._matchers import (
+from dmock._mock import DeclarativeMock
+from dmock.matchers import (
     Anything,
     AnythingOfType,
     GreaterThan,
     Regex,
 )
-from dmock._mock import DeclarativeMock
 
 
 pytest_plugins = ["pytester"]
@@ -78,7 +78,8 @@ class TestPluginReportsTheTest:
             """
             from abc import ABC
 
-            from dmock import AnythingOfType, DeclarativeMock, GreaterThan, in_order
+            from dmock import DeclarativeMock, in_order
+            from dmock.matchers import AnythingOfType, GreaterThan
 
             class Billing(ABC):
                 def quote(self, sku: str) -> int: ...
@@ -110,7 +111,8 @@ class TestPluginReportsTheTest:
         # Arrange
         pytester.makepyfile(
             """
-            from dmock import DeclarativeMock, Regex
+            from dmock import DeclarativeMock
+            from dmock.matchers import Regex
 
             class Billing:
                 def quote(self, sku: str) -> int: ...

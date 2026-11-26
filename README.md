@@ -52,7 +52,8 @@ assert name.startswith("a")
 Here's an example of how **dmock** improves your tests:
 
 ```python
-from dmock import DeclarativeMock, IsNow, StartsWith
+from dmock import DeclarativeMock
+from dmock.matchers import IsNow, StartsWith
 
 service = DeclarativeMock(Directory)
 service.expect(Directory.lookup, StartsWith("a")).returns(
@@ -94,7 +95,8 @@ assert calc.price(100) == 99  # from .returns(99)
 `expect(...)` with no further arguments matches a call with no arguments. A keyword matches only that keyword:
 
 ```python
-from dmock import Anything, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import Anything
 
 m = DeclarativeMock(Worker)
 m.expect("run")  # called with no arguments
@@ -105,7 +107,8 @@ m.expect("run", job_id=123).returns("queued")  # this is keyword only
 `ANY_ARGS` and `ANY_KWARGS` match any positional and keyword arguments, including none:
 
 ```python
-from dmock import ANY_ARGS, ANY_KWARGS, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import ANY_ARGS, ANY_KWARGS
 
 m = DeclarativeMock(Worker)
 m.expect("run", ANY_ARGS, ANY_KWARGS).returns(0)  # any positional and keyword args, including none
@@ -133,7 +136,8 @@ calc.verify()
 Async methods use the same DSL. `runs()` accepts a sync or an async function:
 
 ```python
-from dmock import Anything, DeclarativeMock
+from dmock import DeclarativeMock
+from dmock.matchers import Anything
 
 mock = DeclarativeMock(MyService)
 mock.expect(MyService.aprocess_order, Anything()).returns("ok")
@@ -155,9 +159,9 @@ The matcher set is rich enough that even the most complicated call stays as **on
 
 ```python
 from typing import Any
-from dmock import (
+from dmock import DeclarativeMock
+from dmock.matchers import (
     AnyOrder,
-    DeclarativeMock,
     Equals,
     GreaterThan,
     HasLen,

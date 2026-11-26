@@ -5,13 +5,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, final, overload
 from unittest.mock import AsyncMock, Mock
 
-from dmock._exceptions import (
-    BlockedCallError,
-    ConfigurationError,
-    NoMatchingCallError,
-    UnregisteredCallError,
-    UnsatisfiedExpectationError,
-)
 from dmock._interaction import Interaction, Mediator
 from dmock._protocols import T
 from dmock._registry import MockRegistry
@@ -22,6 +15,13 @@ from dmock._types import (
     ReturnOutcome,
     RunOutcome,
 )
+from dmock.exceptions._exceptions import (
+    BlockedCallError,
+    ConfigurationError,
+    NoMatchingCallError,
+    UnregisteredCallError,
+    UnsatisfiedExpectationError,
+)
 
 
 if TYPE_CHECKING:
@@ -29,12 +29,12 @@ if TYPE_CHECKING:
     from typing import Any, Concatenate
 
     from dmock._interaction import Expectation, Observation
-    from dmock._matchers import (
+    from dmock._protocols import ClassOf, P, PropertyOf, R
+    from dmock._types import Outcome
+    from dmock.matchers._matchers import (
         _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
         _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
     )
-    from dmock._protocols import ClassOf, P, PropertyOf, R
-    from dmock._types import Outcome
 
     class _Base(Any):  # type: ignore[misc]
         pass
@@ -86,7 +86,8 @@ class DeclarativeMock(Generic[T], _Base):
         **kwargs: Forwarded to ``unittest.mock.Mock``.
 
     Examples:
-        >>> from dmock import AnythingOfType, DeclarativeMock
+        >>> from dmock import DeclarativeMock
+        >>> from dmock.matchers import AnythingOfType
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
         >>> mock = DeclarativeMock(Service)
@@ -322,7 +323,8 @@ class DeclarativeMock(Generic[T], _Base):
                 and includes the call history when any calls were dispatched.
 
         Examples:
-            >>> from dmock import DeclarativeMock, UnsatisfiedExpectationError
+            >>> from dmock import DeclarativeMock
+            >>> from dmock.exceptions import UnsatisfiedExpectationError
             >>> class Service:
             ...     def fetch(self, key: str) -> str: ...
             >>> mock = DeclarativeMock(Service)

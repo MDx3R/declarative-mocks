@@ -9,11 +9,6 @@ from typing import (
     overload,
 )
 
-from dmock._exceptions import ConfigurationError, ExceededCallError
-from dmock._matchers import (
-    _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
-    _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
-)
 from dmock._protocols import P, R, T
 from dmock._types import (
     AtLeast,
@@ -27,6 +22,11 @@ from dmock._types import (
     ReturnCheck,
     ReturnOutcome,
     RunOutcome,
+)
+from dmock.exceptions._exceptions import ConfigurationError, ExceededCallError
+from dmock.matchers._matchers import (
+    _AnyArgsSentinel,  # pyright: ignore[reportPrivateUsage]
+    _AnyKwargsSentinel,  # pyright: ignore[reportPrivateUsage]
 )
 
 
@@ -586,7 +586,8 @@ class Observation(ABC, Generic[T, P, R]):
     successive matching calls.
 
     Examples:
-        >>> from dmock import Check, DeclarativeSpy
+        >>> from dmock import DeclarativeSpy
+        >>> from dmock.checks import Check
         >>> class Service:
         ...     def __init__(self) -> None:
         ...         self._values = iter(["first", "second", "ok", "ok"])
@@ -766,7 +767,8 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If `repeat` is less than 1.
 
         Examples:
-            >>> from dmock import Check, DeclarativeSpy
+            >>> from dmock import DeclarativeSpy
+            >>> from dmock.checks import Check
             >>> class Service:
             ...     def fetch(self, key: str) -> str:
             ...         return key.upper()
@@ -864,7 +866,8 @@ class Observation(ABC, Generic[T, P, R]):
             ConfigurationError: If `repeat` is less than 1.
 
         Examples:
-            >>> from dmock import Check, DeclarativeSpy
+            >>> from dmock import DeclarativeSpy
+            >>> from dmock.checks import Check
             >>> class Service:
             ...     def fetch(self, key: str) -> str:
             ...         return key.upper()

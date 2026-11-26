@@ -6,13 +6,7 @@ from typing import TYPE_CHECKING, Any, Generic
 
 import pytest
 
-from dmock._exceptions import (
-    ConfigurationError,
-    ExceededCallError,
-    UnexpectedCallError,
-)
 from dmock._interaction import Interaction, Mediator
-from dmock._matchers import ANY_ARGS, ANY_KWARGS, Anything, AnythingOfType, MatchedBy
 from dmock._protocols import T
 from dmock._types import (
     AtLeast,
@@ -27,6 +21,12 @@ from dmock._types import (
     ReturnOutcome,
     RunOutcome,
 )
+from dmock.exceptions._exceptions import (
+    ConfigurationError,
+    ExceededCallError,
+    UnexpectedCallError,
+)
+from dmock.matchers import ANY_ARGS, ANY_KWARGS, Anything, AnythingOfType, MatchedBy
 
 
 if TYPE_CHECKING:
