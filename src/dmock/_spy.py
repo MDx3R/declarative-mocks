@@ -100,15 +100,26 @@ class DeclarativeSpy(Generic[T], _Base):
         >>> class Service:
         ...     def fetch(self, key: str) -> str:
         ...         return key.upper()
+        ...
+        ...     def close(self) -> None:
+        ...         pass
         >>> spy = DeclarativeSpy(Service())
         >>> spy.observe("fetch", "a").returns("A").once()
         Observation(fetch('a'))
         >>> spy.fetch("a")
         'A'
-        >>> spy.observe(Service.fetch, AnythingOfType(str)).returns("B").once()
-        Observation(fetch(AnythingOfType(str, exact=False)))
+        >>> (
+        ...     spy.observe(Service.fetch, AnythingOfType(str))
+        ...     .returns("B")
+        ...     .once()
+        ...     .observe(Service.close)
+        ...     .returns(None)
+        ...     .once()
+        ... )
+        Observation(close())
         >>> spy.fetch("b")
         'B'
+        >>> spy.close()
         >>> spy.verify()
         >>> spy
         DeclarativeSpy(obj=<...Service object...>)

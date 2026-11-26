@@ -85,6 +85,9 @@ api.expect(ApiClient.next_page).returns({"items": [1], "cursor": "a"})
 # or you could use the string form to produce a lenient expectation: any arguments, any outcome
 api.expect("next_page").returns({"items": [2], "cursor": None})
 # first call → first dict; second call → second dict
+# Same args → registration order; different args → matched by args.
+# Chain .expect(...) or use in_order(...) to enforce strict order across different calls:
+api.expect("next_page", limit=5).returns({"items": []}).once().expect("close").raises(TimeoutError)
 
 calc = DeclarativeMock(Calculator)
 calc.expect("price", 100).runs(lambda x: x - 1).returns(99)
@@ -221,7 +224,7 @@ assert bus.publish(
 bus.verify()
 ```
 
-**dmock** also supports pass-through spies, composable predicates and chained `.expect(...)` / `.observe(...)` ordering:
+**dmock** also supports pass-through spies using the same declarative DSL:
 
 ```python
 from dmock import DeclarativeSpy
@@ -243,7 +246,7 @@ class Store:
 store = Store()
 spy = DeclarativeSpy(store)
 
-_ = (
+(
     spy.observe(Store.save, "a", "A")
     .returns(
         True,

@@ -1750,6 +1750,25 @@ def in_order(
         'A'
         >>> mock.stop()
         >>> mock.verify()
+
+        Mocks and spies can also be ordered together:
+
+        >>> from dmock import DeclarativeSpy
+        >>> class Audit:
+        ...     def record(self, event: str) -> bool:
+        ...         return True
+        >>> spy = DeclarativeSpy(Audit())
+        >>> m = DeclarativeMock(Service)
+        >>> step1 = m.expect("start").returns(None).once()
+        >>> step2 = spy.observe(Audit.record, "started").returns(True).once()
+        >>> step3 = m.expect("stop").returns(None).once()
+        >>> in_order(step1, step2, step3)
+        >>> m.start()
+        >>> spy.record("started")
+        True
+        >>> m.stop()
+        >>> m.verify()
+        >>> spy.verify()
     """
     for i in range(1, len(interactions)):
         interactions[i].not_before(interactions[i - 1])

@@ -90,15 +90,24 @@ class DeclarativeMock(Generic[T], _Base):
         >>> from dmock.matchers import AnythingOfType
         >>> class Service:
         ...     def fetch(self, key: str) -> str: ...
+        ...     def close(self) -> None: ...
         >>> mock = DeclarativeMock(Service)
         >>> mock.expect("fetch", "a").returns("A").once()
         Expectation(fetch('a'))
         >>> mock.fetch("a")
         'A'
-        >>> mock.expect(Service.fetch, AnythingOfType(str)).returns("B").once()
-        Expectation(fetch(AnythingOfType(str, exact=False)))
+        >>> (
+        ...     mock.expect(Service.fetch, AnythingOfType(str))
+        ...     .returns("B")
+        ...     .once()
+        ...     .expect(Service.close)
+        ...     .returns(None)
+        ...     .once()
+        ... )
+        Expectation(close())
         >>> mock.fetch("b")
         'B'
+        >>> mock.close()
         >>> mock.verify()
         >>> mock
         DeclarativeMock(spec=Service)
