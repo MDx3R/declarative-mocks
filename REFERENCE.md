@@ -15,7 +15,7 @@ Constructs a whitelist mock that wraps `unittest.mock.Mock(spec=spec, **kwargs)`
 
 Every spec method call must be preceded by a matching `expect()` registration; calls without one raise `UnexpectedCallError`. Dunder methods (e.g. `__repr__`) delegate to the internal Mock unless explicitly registered.
 
-Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The caller must `await` the call. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction(mock.async_method)` is true on every supported Python (3.11-3.14).
+Async methods on the spec are detected automatically: `expect()` and all outcomes (`returns`, `raises`, `runs`, quantifiers) work identically for async methods. The caller must `await` the call. The installed wrapper is a nested `async def`, so `inspect.iscoroutinefunction(mock.async_method)` is true on every supported Python (3.11-3.15).
 
 The names `expect`, `property`, and `verify` are reserved for the DSL. If the spec defines any of them, `DeclarativeMock(spec)` raises `ConfigurationError` at construction time (the real attribute would otherwise be shadowed by the DSL method).
 

@@ -1,6 +1,6 @@
 ![Checks](https://github.com/MDx3R/declarative-mocks/actions/workflows/ci.yml/badge.svg)
 ![PyPI](https://img.shields.io/pypi/v/declarative-mocks.svg)
-![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14%20%7C%203.15-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
 # declarative-mocks
