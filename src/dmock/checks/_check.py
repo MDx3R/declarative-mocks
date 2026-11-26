@@ -42,7 +42,7 @@ class Check(Generic[T]):
         """Return ``True`` if every predicate returns ``True`` for `value`."""
         return all(p(value) for p in self._predicates)
 
-    def __invert__(self) -> CheckNot[T]:
+    def __invert__(self) -> Check[T]:
         """Return a :class:`CheckNot` negating this check.
 
         Examples:
@@ -55,7 +55,7 @@ class Check(Generic[T]):
         """
         return CheckNot(self)
 
-    def __and__(self, other: Predicate[T]) -> CheckAnd[T]:
+    def __and__(self, other: Predicate[T]) -> Check[T]:
         """Return a :class:`CheckAnd` requiring both `self` and `other`.
 
         Examples:
@@ -71,14 +71,14 @@ class Check(Generic[T]):
 
         return CheckAnd(self, cast("Check[T]", other))
 
-    def __rand__(self, other: Predicate[T]) -> CheckAnd[T]:
+    def __rand__(self, other: Predicate[T]) -> Check[T]:
         """Return a :class:`CheckAnd` when the left operand is a plain callable."""
         if not isinstance(other, Check):
             return CheckAnd(self, other)
 
         return NotImplemented
 
-    def __or__(self, other: Predicate[T]) -> CheckOr[T]:
+    def __or__(self, other: Predicate[T]) -> Check[T]:
         """Return a :class:`CheckOr` requiring either `self` or `other`.
 
         Examples:
@@ -94,7 +94,7 @@ class Check(Generic[T]):
 
         return CheckOr(self, cast("Check[T]", other))
 
-    def __ror__(self, other: Predicate[T]) -> CheckOr[T]:
+    def __ror__(self, other: Predicate[T]) -> Check[T]:
         """Return a :class:`CheckOr` when the left operand is a plain callable."""
         if not isinstance(other, Check):
             return CheckOr(other, self)
@@ -125,9 +125,6 @@ class CheckNot(Check[T]):
         False
     """
 
-    def __init__(self, /, *predicates: Predicate[T]) -> None:
-        self._predicates = predicates
-
     def __call__(self, value: T) -> bool:
         """Return ``True`` if no predicate matches `value`."""
         return not any(p(value) for p in self._predicates)
@@ -150,9 +147,6 @@ class CheckAnd(Check[T]):
         False
     """
 
-    def __init__(self, /, *predicates: Predicate[T]) -> None:
-        self._predicates = predicates
-
     def __call__(self, value: T) -> bool:
         """Return ``True`` if every predicate matches `value`."""
         return all(p(value) for p in self._predicates)
@@ -174,9 +168,6 @@ class CheckOr(Check[T]):
         >>> extreme(50)
         False
     """
-
-    def __init__(self, /, *predicates: Predicate[T]) -> None:
-        self._predicates = predicates
 
     def __call__(self, value: T) -> bool:
         """Return ``True`` if at least one predicate matches `value`."""

@@ -591,18 +591,28 @@ class Observation(ABC, Generic[T, P, R]):
         >>> class Service:
         ...     def __init__(self) -> None:
         ...         self._values = iter(["first", "second", "ok", "ok"])
+        ...         self.history: list[str] = []
         ...
         ...     def fetch(self, key: str) -> str:
-        ...         return next(self._values)
-        >>> spy = DeclarativeSpy(Service())
+        ...         value = next(self._values)
+        ...         self.history.append(key)
+        ...         return value
+        >>> service = Service()
+        >>> spy = DeclarativeSpy(service)
         >>> spy.observe("fetch", "a").returns("first").returns("second")
         Observation(fetch('a'))
         >>> spy.fetch("a")
         'first'
         >>> spy.fetch("a")
         'second'
-        >>> is_short = Check[str](str.islower) & (lambda v: len(v) == 2)
-        >>> spy.observe("fetch", "b").returns("ok", condition=is_short, repeat=2)
+        >>> spy.observe("fetch", "b").returns(
+        ...     "ok",
+        ...     condition=Check[str](
+        ...         lambda _: "b" in service.history,
+        ...         lambda _: len(service.history) >= 3,
+        ...     ),
+        ...     repeat=2,
+        ... )
         Observation(fetch('b'))
         >>> spy.fetch("b")
         'ok'
@@ -769,21 +779,34 @@ class Observation(ABC, Generic[T, P, R]):
         Examples:
             >>> from dmock import DeclarativeSpy
             >>> from dmock.checks import Check
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str:
-            ...         return key.upper()
-            >>> spy = DeclarativeSpy(Service())
-            >>> spy.observe("fetch", "a").returns("A")
-            Observation(fetch('a'))
-            >>> spy.fetch("a")
-            'A'
-            >>> is_upper = Check[str](str.isupper) & (lambda v: len(v) == 1)
-            >>> spy.observe("fetch", "b").returns("B", condition=is_upper, repeat=2)
-            Observation(fetch('b'))
-            >>> spy.fetch("b")
-            'B'
-            >>> spy.fetch("b")
-            'B'
+            >>> class Store:
+            ...     def __init__(self) -> None:
+            ...         self.items: dict[str, str] = {}
+            ...         self.dirty = False
+            ...
+            ...     def save(self, key: str, value: str) -> bool:
+            ...         self.items[key] = value
+            ...         self.dirty = False
+            ...         return True
+            >>> store = Store()
+            >>> spy = DeclarativeSpy(store)
+            >>> spy.observe("save", "a", "A").returns(True)
+            Observation(save('a', 'A'))
+            >>> spy.save("a", "A")
+            True
+            >>> spy.observe("save", "b", "B").returns(
+            ...     True,
+            ...     condition=Check[bool](
+            ...         lambda _: store.items.get("b") == "B",
+            ...         lambda _: not store.dirty,
+            ...     ),
+            ...     repeat=2,
+            ... )
+            Observation(save('b', 'B'))
+            >>> spy.save("b", "B")
+            True
+            >>> spy.save("b", "B")
+            True
         """
         ...
 
@@ -868,28 +891,38 @@ class Observation(ABC, Generic[T, P, R]):
         Examples:
             >>> from dmock import DeclarativeSpy
             >>> from dmock.checks import Check
-            >>> class Service:
-            ...     def fetch(self, key: str) -> str:
-            ...         return key.upper()
-            >>> seen: list[str] = []
-            >>> def check_upper(value: str) -> bool:
-            ...     seen.append(value)
-            ...     return value.isupper()
-            >>> spy = DeclarativeSpy(Service())
-            >>> spy.observe("fetch", "a").condition(check_upper).returns("A")
-            Observation(fetch('a'))
-            >>> spy.fetch("a")
+            >>> class Store:
+            ...     def __init__(self) -> None:
+            ...         self.items: dict[str, str] = {}
+            ...         self.committed = False
+            ...
+            ...     def save(self, key: str, value: str) -> str:
+            ...         self.items[key] = value
+            ...         self.committed = True
+            ...         return value
+            >>> store = Store()
+            >>> spy = DeclarativeSpy(store)
+            >>> spy.observe("save", "a", "A").condition(
+            ...     lambda _: store.items.get("a") == "A"
+            ... ).returns("A")
+            Observation(save('a', 'A'))
+            >>> spy.save("a", "A")
             'A'
-            >>> seen
-            ['A']
-            >>> spy.fetch("a")
+            >>> store.items["a"]
             'A'
-            >>> is_single_upper = Check[str](str.isupper) & (lambda v: len(v) == 1)
-            >>> spy.observe("fetch", "b").condition(is_single_upper, repeat=2)
-            Observation(fetch('b'))
-            >>> spy.fetch("b")
+            >>> spy.save("a", "A")
+            'A'
+            >>> spy.observe("save", "b", "B").condition(
+            ...     Check[str](
+            ...         lambda _: "b" in store.items,
+            ...         lambda _: store.committed,
+            ...     ),
+            ...     repeat=2,
+            ... )
+            Observation(save('b', 'B'))
+            >>> spy.save("b", "B")
             'B'
-            >>> spy.fetch("b")
+            >>> spy.save("b", "B")
             'B'
         """
         ...
