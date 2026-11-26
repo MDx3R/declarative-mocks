@@ -67,15 +67,15 @@ mock.expect(MyService.process_order, 123).returns("processed")
 mock.expect("process_order", order_id=123).returns("processed")
 ```
 
-### `… .returns(value, *, repeat=1)`
+### `… .returns(value, /, *, repeat=1)`
 
 Declares a return value for the next matching call. Returns a single Python object; tuples are returned as tuples without unpacking. `repeat` appends that outcome once per count (default 1). `repeat` less than 1 raises `ConfigurationError`.
 
-### `… .raises(exc, *, repeat=1)`
+### `… .raises(exc, /, *, repeat=1)`
 
 Declares that the next matching call raises `exc`. If `exc` is an exception type (not an instance), it is instantiated with no arguments before raising. `repeat` works as on `returns`.
 
-### `… .runs(func, *, repeat=1)`
+### `… .runs(func, /, *, repeat=1)`
 
 Calls `func(*args, **kwargs)` with the actual call arguments when this expectation matches. The return value of `func` becomes the result of the call. `repeat` works as on `returns`.
 
@@ -97,15 +97,15 @@ A method lets a type checker check `*args`/`**kwargs` and `.returns` / `.raises`
 
 Raises `AttributeError` if `name` is not on the wrapped object. Raises `ConfigurationError` if `name` is not callable or cannot be resolved. Returns an `Observation` for chaining checks and quantifiers.
 
-### `… .returns(value, *, condition=None, repeat=1)`
+### `… .returns(value, /, *, condition=None, repeat=1)`
 
 Asserts that the real call returned a value equal to `value` (`actual == value`). If `condition` is provided, calls `condition(actual)` after `value` matches and asserts it returns truthy. Raises `DeclarativeMockError` if the real call raised, returned a different value, or `condition` returned falsy; otherwise returns the real value. `repeat` works as on `Expectation.returns`.
 
-### `… .raises(exc, *, condition=None, repeat=1)`
+### `… .raises(exc, /, *, condition=None, repeat=1)`
 
 Asserts that the real call raised `exc` (type checked via `isinstance`, or instance checked via matching type and `str(actual) == str(exc)`). If `condition` is provided, calls `condition(actual_exc)` after `exc` matches. Raises `DeclarativeMockError` on mismatch; otherwise re-raises the real exception. `repeat` works as on `Expectation.raises`.
 
-### `… .condition(func, *, repeat=1)`
+### `… .condition(func, /, *, repeat=1)`
 
 Calls `func(result)` with the real return value or raised exception and asserts it returns truthy. Raises `DeclarativeMockError` if falsy; otherwise returns the real value or re-raises the real exception. `repeat` works as on `Expectation.returns`.
 
@@ -140,15 +140,15 @@ mock.expect("do_something").returns("ok", repeat=2).returns("fail")
 
 **One** quantifier per `expect(...)` chain. It applies to the whole expectation, not to the last outcome. A second quantifier on the same chain raises `ConfigurationError`.
 
-| Method            | Meaning                                              |
-| ----------------- | ---------------------------------------------------- |
-| `once()`          | Exactly one matching call                            |
-| `twice()`         | Exactly two                                          |
-| `times(n)`        | Exactly `n`                                          |
-| `at_least(n)`     | Minimum `n`, no upper bound                          |
-| `at_most(n)`      | Between 0 and `n` inclusive                          |
-| `between(lo, hi)` | Inclusive range                                      |
-| `never()`         | Must not match; any matching call raises immediately |
+| Method               | Meaning                                              |
+| -------------------- | ---------------------------------------------------- |
+| `once()`             | Exactly one matching call                            |
+| `twice()`            | Exactly two                                          |
+| `times(n, /)`        | Exactly `n`                                          |
+| `at_least(n, /)`     | Minimum `n`, no upper bound                          |
+| `at_most(n, /)`      | Between 0 and `n` inclusive                          |
+| `between(lo, hi, /)` | Inclusive range                                      |
+| `never()`            | Must not match; any matching call raises immediately |
 
 If no quantifier is set, the expectation defaults to `ExactlyN(max(1, len(outcomes)))`.
 

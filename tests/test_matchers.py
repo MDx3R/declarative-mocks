@@ -1411,7 +1411,7 @@ class TestRegex:
         assert matcher.matches(value) is False
 
     def test_ignore_case_flag(self) -> None:
-        assert RegexMatch("a", re.IGNORECASE).matches("A") is True
+        assert RegexMatch("a", flags=re.IGNORECASE).matches("A") is True
 
     def test_match_is_case_sensitive(self) -> None:
         assert RegexMatch("a").matches("A") is False
@@ -1420,7 +1420,7 @@ class TestRegex:
         assert RegexSearch(re.compile(r"ey")).matches("key") is True
 
     def test_compiled_pattern_with_flags_raises(self) -> None:
-        matcher = RegexMatch(re.compile("a"), re.IGNORECASE)
+        matcher = RegexMatch(re.compile("a"), flags=re.IGNORECASE)
         with pytest.raises(ValueError, match="flags"):
             matcher.matches("A")
 
